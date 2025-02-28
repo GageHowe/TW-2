@@ -97,9 +97,16 @@ void ATestActor::GetVelocityAtLocation(int ID, FVector Location, FVector&Velocit
 // 	AddRigidBody(Body, Friction, Restitution, int& ID, float mass);
 // }
 
-void ATestActor::MC_SendStateToClients_Implementation(FBulletPlayerInput input)
+void ATestActor::MC_SendStateToClients_Implementation(FBulletSimulationState serverState)
 {
 	// TODO this does nothing yet
+	BtCriticalSection.Lock();
+
+	for (btRigidBody* i : BtRigidBodies) {
+		
+	}
+	
+	BtCriticalSection.Unlock();
 }
 
 void ATestActor::Correct(FBulletSimulationState serverState)
@@ -172,9 +179,11 @@ void ATestActor::UpdateProcBody(AActor* Body, float Friction, TArray<FVector> a,
 }
 void ATestActor::AddRigidBody(AActor* Body /* the pawn/actor */, float Friction, float Restitution, int& ID,float mass)
 {
+	BtCriticalSection.Lock();
 	auto rbody = AddRigidBody(Body, GetCachedDynamicShapeData(Body, mass), Friction, Restitution);
 	ID = BtRigidBodies.Num() - 1;
 	// AddBodyToMap(ID, rbody);
+	BtCriticalSection.Unlock();
 }
 void ATestActor::UpdatePlayertransform(AActor* player, int ID)
 {

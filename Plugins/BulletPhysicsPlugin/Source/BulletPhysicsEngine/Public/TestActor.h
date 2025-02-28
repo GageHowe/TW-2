@@ -85,7 +85,7 @@ public:
 	// Sets default values for this actor's properties
 	ATestActor();
 
-	TMpscQueue<FBulletPlayerInput> InputBuffer;	// FIFO Buffer of inputs coming into the server
+	TArray<TMpscQueue<FBulletPlayerInput>> InputBuffers;	// FIFO Buffers of inputs coming into the server
 
 	UPROPERTY(Blueprintable, BlueprintReadWrite, Category = "Physics Networking")
 	TMap<int32, int32> ServerIdToClientId; // Client-side mapping of server IDs to local IDs
@@ -111,8 +111,8 @@ public:
 	btStaticPlaneShape* plane;
 	btIDebugDraw* BtDebugDraw;	// Custom debug interface
 	
-	// Dynamic bodies; this is where IDs will matter
-	TArray<btRigidBody*> BtRigidBodies;
+	FCriticalSection BtCriticalSection; // one rigid body can be inserted at a time
+	TArray<btRigidBody*> BtRigidBodies;	// Dynamic bodies; this is where IDs will matter
 	
 	TArray<btCollisionObject*> BtStaticObjects;	// Static colliders
 	btCollisionObject* procbody;
@@ -220,7 +220,7 @@ public:
 
 	// send the physics state to the players
 	UFUNCTION(NetMulticast, Reliable, BlueprintCallable)
-	void MC_SendStateToClients(FBulletPlayerInput input);
+	void MC_SendStateToClients(FBulletSimulationState serverState);
 
 	UFUNCTION(BlueprintCallable)
 	void Correct(FBulletSimulationState serverState);
