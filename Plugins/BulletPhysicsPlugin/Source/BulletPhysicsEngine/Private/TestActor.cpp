@@ -29,8 +29,8 @@ void ATestActor::BeginPlay()
 	BtWorld = new btDiscreteDynamicsWorld(BtCollisionDispatcher, BtBroadphase, BtConstraintSolver, BtCollisionConfig);
 	BtWorld->setGravity(btVector3(0, 0, 0));
 	
-	//BtWorld->setDebugDrawer(BtDebugDraw);
-	//BtWorld->debugDrawWorld();
+	BtWorld->setDebugDrawer(BtDebugDraw);
+	BtWorld->debugDrawWorld();
 	// I mess with a few settings on BtWorld->getSolverInfo() but they're specific to my needs	
 
 	// Gravity vector in our units (1=1cm)
@@ -65,73 +65,18 @@ void ATestActor::Tick(float DeltaTime)
 	// 	// ApplyInputToPhysics(input); // Predict the physics state locally
 	// }
 	StepPhysics(DeltaTime, 0);
-	// SaveCurrentState();									// save state
 	if (HasAuthority())										// if server,
 	{
+		SaveCurrentState();
+		int count = CurrentState.ObjectStates.Num();
+
+		UE_LOG(LogTemp, Warning, TEXT("Sending %d ObjectStates to clients (BEFORE MC)"), CurrentState.ObjectStates.Num());
+
 		MC_SendPhysicsStateToClient(CurrentState);		// send state to clients
 	}
 	CurrentFrameNumber++;								// increment local frame number
 	randvar = mt->getRandSeed();
 }
-
-void ATestActor::SetupStaticGeometryPhysics(TArray<AActor*> Actors, float Friction, float Restitution)
-{
-	for (AActor* Actor : Actors)
-	{
-		ExtractPhysicsGeometry(Actor,
-			[Actor, this, Friction, Restitution](btCollisionShape* Shape, const FTransform& RelTransform)
-			{
-				// Every sub-collider in the actor is passed to this callback function
-				// We're baking this in world space, so apply actor transform to relative
-				const FTransform FinalXform = RelTransform * Actor->GetActorTransform();
-				AddStaticCollision(Shape, FinalXform, Friction, Restitution, Actor);
-			});
-	}
-}
-
-void ATestActor::AddStaticBody(AActor* Body, float Friction, float Restitution,int &ID)
-{
-		ExtractPhysicsGeometry(Body,[Body, this, Friction, Restitution](btCollisionShape* Shape, const FTransform& RelTransform)
-		{
-			// Every sub-collider in the actor is passed to this callback function
-			// We're baking this in world space, so apply actor transform to relative
-			const FTransform FinalXform = RelTransform * Body->GetActorTransform();
-			AddStaticCollision(Shape, FinalXform, Friction, Restitution, Body);
-		});
-	ID = BtWorld->getNumCollisionObjects() - 1;
-}
-
-void ATestActor::AddProcBody(AActor* Body,  float Friction, TArray<FVector> a, TArray<FVector> b, TArray<FVector> c, TArray<FVector> d, float Restitution, int& ID)
-{
-	btCollisionShape* Shape = GetTriangleMeshShape(a,b,c,d);
-		const FTransform FinalXform = Body->GetActorTransform();
-	 procbody=	AddStaticCollision(Shape, FinalXform, Friction, Restitution, Body);
-	ID = BtWorld->getNumCollisionObjects() - 1;
-}
-
-void ATestActor::UpdateProcBody(AActor* Body, float Friction, TArray<FVector> a, TArray<FVector> b, TArray<FVector> c, TArray<FVector> d, float Restitution, int& ID, int PrevID)
-{
-	BtWorld->removeCollisionObject(procbody);
-	procbody = nullptr;
-
-	btCollisionShape* Shape = GetTriangleMeshShape(a, b, c, d);
-	const FTransform FinalXform = Body->GetActorTransform();
-	procbody = AddStaticCollision(Shape, FinalXform, Friction, Restitution, Body);
-	
-	ID = BtWorld->getNumCollisionObjects() - 1;
-}
-
-void ATestActor::AddRigidBody(AActor* Body, float Friction, float Restitution, int& ID,float mass)
-{
-	AddRigidBody(Body, GetCachedDynamicShapeData(Body, mass), Friction, Restitution);
-	ID = BtRigidBodies.Num() - 1;
-}
-
-void ATestActor::UpdatePlayertransform(AActor* player, int ID)
-{
-		BtWorld->getCollisionObjectArray()[ID]->setWorldTransform(BulletHelpers::ToBt(player->GetActorTransform(), GetActorLocation()));
-}
-
 
 void ATestActor::AddImpulse( int ID, FVector Impulse, FVector Location)
 {
@@ -186,20 +131,22 @@ void ATestActor::SaveCurrentState()
 	CurrentState.ObjectStates.Empty();
 	CurrentState.FrameNumber = CurrentFrameNumber;
 
-	const FVector WorldOrigin = GetActorLocation(); // Use actual world origin
+	UE_LOG(LogTemp, Warning, TEXT("Number of PhysicsObjects: %d"), PhysicsObjects.Num());
 
 	for (const auto& Pair : PhysicsObjects)
 	{
 		FBulletObjectState ObjectState;
 		const btRigidBody* Body = Pair.Value;
 
-		// Convert using proper world origin
-		ObjectState.Transform = BulletHelpers::ToUE(Body->getWorldTransform(), WorldOrigin);
-		ObjectState.Velocity = BulletHelpers::ToUEDir(Body->getLinearVelocity(), true); // Apply scale conversion
+		ObjectState.Transform = BulletHelpers::ToUE(Body->getWorldTransform(), GetActorLocation());
+		ObjectState.Velocity = BulletHelpers::ToUEDir(Body->getLinearVelocity(), true);
 		ObjectState.AngularVelocity = BulletHelpers::ToUEDir(Body->getAngularVelocity(), true);
 		ObjectState.FrameNumber = CurrentFrameNumber;
 
 		CurrentState.ObjectStates.Add(ObjectState);
+
+		// Log the saved state
+		UE_LOG(LogTemp, Warning, TEXT("Saved Object State - ObjectID: %d, FrameNumber: %d"), Pair.Key, ObjectState.FrameNumber);
 	}
 
 	History.Add(CurrentState);
@@ -228,11 +175,11 @@ void ATestActor::ConsumeInput()
 
 bool ATestActor::StatesMatch(const FBulletSimulationState& A, const FBulletSimulationState& B) const
 {
-	GEngine->AddOnScreenDebugMessage( 6,          // Key: Unique identifier for the message, -1 to display multiple times
-		5.0f,        // Duration: Time in seconds the message stays on screen
-		FColor::Green, // Color: Text color, e.g., FColor::Red, FColor::Green
-		TEXT("Checking if physics states match") // Message: The string to display
-	);
+	// GEngine->AddOnScreenDebugMessage( 6,          // Key: Unique identifier for the message, -1 to display multiple times
+	// 	5.0f,        // Duration: Time in seconds the message stays on screen
+	// 	FColor::Green, // Color: Text color, e.g., FColor::Red, FColor::Green
+	// 	TEXT("Checking if physics states match") // Message: The string to display
+	// );
 	if (A.ObjectStates.Num() != B.ObjectStates.Num()) return false;
     
 	for (int32 i = 0; i < A.ObjectStates.Num(); i++)
@@ -249,16 +196,21 @@ bool ATestActor::StatesMatch(const FBulletSimulationState& A, const FBulletSimul
 
 void ATestActor::MC_SendPhysicsStateToClient_Implementation(FBulletSimulationState state)
 {
-	// Find matching frame in history
-	const FBulletSimulationState* ClientState = History.FindByPredicate(
-		[&](const FBulletSimulationState& s) { return s.FrameNumber == state.FrameNumber; });
+	// // Find matching frame in history
+	// const FBulletSimulationState* ClientState = History.FindByPredicate(
+	// 	[&](const FBulletSimulationState& s) { return s.FrameNumber == state.FrameNumber; });
 
 	if (!HasAuthority())
 	{
+		UE_LOG(LogTemp, Warning, TEXT("Sending %d ObjectStates to clients"), state.ObjectStates.Num());
 		ClientCorrection(state);
 		History.Empty();
 		History.Add(state);
-		CurrentState = state;
+		// GEngine->AddOnScreenDebugMessage( -1,
+		// 	5.0f,
+		// 	FColor::Green,
+		// 	TEXT("Physics states matched")
+		// );
 	}
 	
 	// // Are client and server states different?
@@ -287,11 +239,11 @@ void ATestActor::MC_SendPhysicsStateToClient_Implementation(FBulletSimulationSta
 // steps the physics simulation x frames to catch up
 void ATestActor::StepPhysicsXFrames(int frames)
 {
-	GEngine->AddOnScreenDebugMessage( 2,          // Key: Unique identifier for the message, -1 to display multiple times
-		5.0f,        // Duration: Time in seconds the message stays on screen
-		FColor::Green, // Color: Text color, e.g., FColor::Red, FColor::Green
-		TEXT("manually stepped physics sim") // Message: The string to display
-	);
+	// GEngine->AddOnScreenDebugMessage( 2,          // Key: Unique identifier for the message, -1 to display multiple times
+	// 	5.0f,        // Duration: Time in seconds the message stays on screen
+	// 	FColor::Green, // Color: Text color, e.g., FColor::Red, FColor::Green
+	// 	TEXT("manually stepped physics sim") // Message: The string to display
+	// );
 	for (int i = 0; i < frames; i++)
 	{
 		StepPhysics(0.016666666 /* 60 frames per second */, 0);
@@ -300,38 +252,41 @@ void ATestActor::StepPhysicsXFrames(int frames)
 
 void ATestActor::ClientCorrection(FBulletSimulationState state)
 {
-	// Clear all forces and velocities on the client
-	for (auto& Pair : PhysicsObjects)
-	{
-		btRigidBody* Body = Pair.Value;
-		Body->clearForces();
-		Body->setLinearVelocity(btVector3(0, 0, 0));
-		Body->setAngularVelocity(btVector3(0, 0, 0));
-	}
-
+	// // Clear all forces and velocities on the client
+	// for (auto& Pair : PhysicsObjects)
+	// {
+	// 	btRigidBody* Body = Pair.Value;
+	// 	Body->clearForces();
+	// 	Body->setLinearVelocity(btVector3(0, 0, 0));
+	// 	Body->setAngularVelocity(btVector3(0, 0, 0));
+	// }
+	
 	// Apply the server's state to all objects
 	for (const FBulletObjectState& ObjectState : state.ObjectStates)
 	{
+		GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Green, TEXT("Applying Object State"));
 		if (btRigidBody* Body = PhysicsObjects.FindRef(ObjectState.ObjectID))
 		{
 			// Apply transform
 			Body->setWorldTransform(BulletHelpers::ToBt(ObjectState.Transform, {0, 0, 0}));
-
+	
 			// Apply velocities (ensure scaling is correct)
 			Body->setLinearVelocity(BulletHelpers::ToBtDir(ObjectState.Velocity, true)); // true = apply scaling
 			Body->setAngularVelocity(BulletHelpers::ToBtDir(ObjectState.AngularVelocity, true));
-
+	
 			// Reactivate the body
 			Body->activate(true);
+		} else
+		{
+			GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Green, TEXT("Did not find ObjectID in PhysicsObjects"));
 		}
 	}
+	GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Green, TEXT("Done"));
 
 	// Update the client's frame number to match the server
 	// CurrentFrameNumber = state.FrameNumber;
-
-	GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Green, TEXT("Client corrected to server state"));
 }
-
+	
 // applies the DesiredState (from server) to ObjectState (on client)
 void ATestActor::ApplyObjectState(FBulletObjectState& ObjectState, const FBulletObjectState& DesiredState)
 {
@@ -360,6 +315,65 @@ void ATestActor::ApplyObjectState(FBulletObjectState& ObjectState, const FBullet
 
 // END NEW METHODS
 
+void ATestActor::SetupStaticGeometryPhysics(TArray<AActor*> Actors, float Friction, float Restitution)
+{
+	for (AActor* Actor : Actors)
+	{
+		ExtractPhysicsGeometry(Actor,
+			[Actor, this, Friction, Restitution](btCollisionShape* Shape, const FTransform& RelTransform)
+			{
+				// Every sub-collider in the actor is passed to this callback function
+				// We're baking this in world space, so apply actor transform to relative
+				const FTransform FinalXform = RelTransform * Actor->GetActorTransform();
+				AddStaticCollision(Shape, FinalXform, Friction, Restitution, Actor);
+			});
+	}
+}
+
+void ATestActor::AddStaticBody(AActor* Body, float Friction, float Restitution,int &ID)
+{
+		ExtractPhysicsGeometry(Body,[Body, this, Friction, Restitution](btCollisionShape* Shape, const FTransform& RelTransform)
+		{
+			// Every sub-collider in the actor is passed to this callback function
+			// We're baking this in world space, so apply actor transform to relative
+			const FTransform FinalXform = RelTransform * Body->GetActorTransform();
+			AddStaticCollision(Shape, FinalXform, Friction, Restitution, Body);
+		});
+	ID = BtWorld->getNumCollisionObjects() - 1;
+}
+
+void ATestActor::AddProcBody(AActor* Body,  float Friction, TArray<FVector> a, TArray<FVector> b, TArray<FVector> c, TArray<FVector> d, float Restitution, int& ID)
+{
+	btCollisionShape* Shape = GetTriangleMeshShape(a,b,c,d);
+		const FTransform FinalXform = Body->GetActorTransform();
+	 procbody=	AddStaticCollision(Shape, FinalXform, Friction, Restitution, Body);
+	ID = BtWorld->getNumCollisionObjects() - 1;
+}
+
+void ATestActor::UpdateProcBody(AActor* Body, float Friction, TArray<FVector> a, TArray<FVector> b, TArray<FVector> c, TArray<FVector> d, float Restitution, int& ID, int PrevID)
+{
+	BtWorld->removeCollisionObject(procbody);
+	procbody = nullptr;
+
+	btCollisionShape* Shape = GetTriangleMeshShape(a, b, c, d);
+	const FTransform FinalXform = Body->GetActorTransform();
+	procbody = AddStaticCollision(Shape, FinalXform, Friction, Restitution, Body);
+	
+	ID = BtWorld->getNumCollisionObjects() - 1;
+}
+
+void ATestActor::AddRigidBody(AActor* Body, float Friction, float Restitution, int& ID,float mass)
+{
+	auto rbody = AddRigidBody(Body, GetCachedDynamicShapeData(Body, mass), Friction, Restitution);
+	ID = BtRigidBodies.Num() - 1;
+	AddBodyToMap(ID, rbody);
+}
+
+void ATestActor::UpdatePlayertransform(AActor* player, int ID)
+{
+		BtWorld->getCollisionObjectArray()[ID]->setWorldTransform(BulletHelpers::ToBt(player->GetActorTransform(), GetActorLocation()));
+}
+
 void ATestActor::ExtractPhysicsGeometry(AActor* Actor, PhysicsGeometryCallback CB)
 {
 	TInlineComponentArray<UActorComponent*, 20> Components;
@@ -382,7 +396,6 @@ void ATestActor::ExtractPhysicsGeometry(AActor* Actor, PhysicsGeometryCallback C
 	}
 }
 
-
 btCollisionObject* ATestActor::AddStaticCollision(btCollisionShape* Shape, const FTransform& Transform, float Friction,
 	float Restitution, AActor* Actor)
 {
@@ -400,10 +413,6 @@ btCollisionObject* ATestActor::AddStaticCollision(btCollisionShape* Shape, const
 	
 	return Obj;
 }
-
-
-
-
 
 void ATestActor::ExtractPhysicsGeometry(UStaticMeshComponent* SMC, const FTransform& InvActorXform, PhysicsGeometryCallback CB)
 {
@@ -424,14 +433,12 @@ void ATestActor::ExtractPhysicsGeometry(UStaticMeshComponent* SMC, const FTransf
 
 }
 
-
 void ATestActor::ExtractPhysicsGeometry(UShapeComponent* Sc, const FTransform& InvActorXform, PhysicsGeometryCallback CB)
 {
 	// We want the complete transform from actor to this component, not just relative to parent
 	FTransform CompFullRelXForm = Sc->GetComponentTransform() * InvActorXform;
 	ExtractPhysicsGeometry(CompFullRelXForm, Sc->ShapeBodySetup, CB);
 }
-
 
 void ATestActor::ExtractPhysicsGeometry(const FTransform& XformSoFar, UBodySetup* BodySetup, PhysicsGeometryCallback CB)
 {
@@ -598,7 +605,6 @@ btCollisionShape* ATestActor::GetConvexHullCollisionShape(UBodySetup* BodySetup,
 
 	return C;
 }
-
 
 const ATestActor::CachedDynamicShapeData& ATestActor::GetCachedDynamicShapeData(AActor* Actor, float Mass)
 {

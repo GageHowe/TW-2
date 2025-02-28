@@ -67,7 +67,9 @@ USTRUCT(BlueprintType) // A FBulletSimulationState is an array of all object sta
 struct FBulletSimulationState
 {
 	GENERATED_BODY()
+	UPROPERTY(BlueprintReadWrite, Category = "Physics Networking")
 	TArray<FBulletObjectState> ObjectStates;
+	UPROPERTY(BlueprintReadWrite, Category = "Physics Networking")
 	int32 FrameNumber;
 
 	void insert(FBulletObjectState obj, int num)
@@ -291,12 +293,12 @@ public:
 	UFUNCTION(BlueprintCallable)
 	void ClientCorrection(FBulletSimulationState state);
 
-
 	// HELPER FUNCTIONS FOR MEMORY AND OBJECT MANAGEMENT
 	
 	void AddBodyToMap(int32 ObjectID, btRigidBody* Body)
 	{
 		PhysicsObjects.Add(ObjectID, Body);
+		UE_LOG(LogTemp, Warning, TEXT("Added Body to Map - ObjectID: %d, Body: %p"), ObjectID, Body);
 	}
 
 	void RemoveBodyFromMap(int32 ObjectID)
@@ -315,9 +317,8 @@ public:
 		return PhysicsObjects.FindRef(ObjectID);
 	}
 	
-	virtual void BeginDestroy() override
+	void RemoveAllBodiesFromMap()
 	{
-		Super::BeginDestroy();
 
 		// Clean up all Bullet rigid bodies
 		for (auto& Pair : PhysicsObjects)
