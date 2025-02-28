@@ -89,22 +89,39 @@ void ATestActor::GetVelocityAtLocation(int ID, FVector Location, FVector&Velocit
 
 // NETWORKING
 
-// // Call this from blueprints to create a synced object
-// void ATestActor::SR_AddRigidBody_Implementation(AActor* Body, float Friction, float Restitution, int ClientID, float mass)
-// {
-// 	AActor* actor = UWorld::SpawnActor();
-// 	int ID;
-// 	AddRigidBody(Body, Friction, Restitution, int& ID, float mass);
-// }
+FBulletSimulationState ATestActor::getState()
+{
+	FBulletSimulationState thisState;
+	thisState.FrameNumber = CurrentFrameNumber;
+
+	// TODO: populate simulation state with all object states
+	
+	return thisState;
+}
 
 void ATestActor::MC_SendStateToClients_Implementation(FBulletSimulationState serverState)
 {
-	// TODO this does nothing yet
+	// TODO finish this
 	BtCriticalSection.Lock();
 
+	// do something for all bodies, this works
 	for (btRigidBody* i : BtRigidBodies) {
+		i->setLinearVelocity({0,0,0});
+	}
+
+	for (auto j : BtRigidBodies)
+	{
 		
 	}
+
+	for (auto i : ServerIdToClientId)
+	{
+		// these are the same i think
+		ServerIdToClientId.Find(i.Key());
+		i.Value();
+	}
+	
+	ServerIdToClientId.Find(2);
 	
 	BtCriticalSection.Unlock();
 }

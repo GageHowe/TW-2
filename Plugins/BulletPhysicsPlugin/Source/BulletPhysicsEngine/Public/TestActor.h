@@ -218,6 +218,9 @@ public:
 	// UFUNCTION(Server, Reliable, BlueprintCallable)
 	// void SR_AddRigidBody(AActor* Body /* the pawn/actor */, float Friction, float Restitution, int ClientID,float mass);
 
+	UFUNCTION(BlueprintCallable)
+	FBulletSimulationState getState();
+	
 	// send the physics state to the players
 	UFUNCTION(NetMulticast, Reliable, BlueprintCallable)
 	void MC_SendStateToClients(FBulletSimulationState serverState);
