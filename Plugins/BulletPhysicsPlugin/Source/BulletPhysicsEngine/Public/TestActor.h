@@ -46,21 +46,23 @@ USTRUCT(BlueprintType) // A FBulletObjectState is the instantaneous state of one
 struct FBulletObjectState
 {
 	GENERATED_BODY()
+
+	// depricated, simply insert objectstate to appropriate index of serverstate
+	// UPROPERTY(BlueprintReadWrite, Category = "Physics Networking")
+	// int32 ID;
 	
 	UPROPERTY(BlueprintReadWrite, Category = "Physics Networking")
-	int32 ObjectID; // Unique ID for the physics object
+	FTransform Transform;
 
 	UPROPERTY(BlueprintReadWrite, Category = "Physics Networking")
-	FTransform Transform; // Transform of the physics object
+	FVector Velocity;
 
 	UPROPERTY(BlueprintReadWrite, Category = "Physics Networking")
-	FVector Velocity;    // Linear velocity of the physics object
+	FVector AngularVelocity;
 
 	UPROPERTY(BlueprintReadWrite, Category = "Physics Networking")
-	FVector AngularVelocity; // Angular velocity of the physics object
-
-	UPROPERTY(BlueprintReadWrite, Category = "Physics Networking")
-	int32 FrameNumber; // Frame number for this state
+	FVector Force;
+	
 };
 
 USTRUCT(BlueprintType) // A FBulletSimulationState is an array of all object states
@@ -87,19 +89,11 @@ public:
 	// Sets default values for this actor's properties
 	ATestActor();
 
-	// FIFO Buffer of inputs coming into the server
-	TMpscQueue<FBulletPlayerInput> InputBuffer;
+	TArray<TMpscQueue<FBulletPlayerInput>> InputBuffers;	// FIFO Buffers of inputs coming into the server
+
+	UPROPERTY(Blueprintable, BlueprintReadWrite, Category = "Physics Networking")
+	TMap<int32, int32> ServerIdToClientId; // Client-side mapping of server IDs to local IDs
 	
-	// History buffer for client-side prediction
-	// UPROPERTY()
-	TArray<FBulletSimulationState> History;
-
-	UFUNCTION(BlueprintCallable)
-	int getNumInHistory()
-	{
-		return History.Num();
-	}
-
 	// current simulation state
 	// server sends this to client who sets their state to it and extrapolates from there
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Physics Networking")
@@ -108,30 +102,6 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Physics Networking")
 	int32 CurrentFrameNumber = 0;	// Global current frame number
 	const float FixedDeltaTime = 1.0f / 60.0f;
-	
-	// UFUNCTION(BlueprintCallable) 	// Add input to the server's input buffer
-	// void AddInputToBuffer(const FPlayerInput& Input);
-	//
-	// UFUNCTION(BlueprintCallable) 	// Process inputs from the buffer at a fixed rate
-	// void ProcessInputBuffer(float DeltaTime);
-	//
-	// UFUNCTION(BlueprintCallable)	// Predict the physics state on the client
-	// void PredictPhysicsState(const FBulletPlayerInput& Input);
-	//
-	// UFUNCTION(BlueprintCallable)	// Reconcile the client's state with the server's state
-	// void ReconcilePhysicsState(const FBulletPhysicsState& ServerState);
-	//
-	// UFUNCTION(BlueprintCallable)	// Rewind and re-simulate physics if necessary
-	// void RewindAndResimulate(int32 FrameNumber);
-	//
-	// UFUNCTION(BlueprintCallable)	// Serialize the physics state for networking
-	// FBulletPhysicsState SerializePhysicsState() const;
-	//
-	// UFUNCTION(BlueprintCallable) 	// Deserialize the physics state from the server
-	// void DeserializePhysicsState(const FBulletPhysicsState& State);
-	//
-	// UFUNCTION(BlueprintCallable)	// Send periodic updates from the server to clients
-	// void SendPhysicsUpdate();
 	
 	// Bullet section
 	// Global objects
@@ -143,20 +113,18 @@ public:
 	BulletHelpers* BulletHelpers;
 	BulletDebugDraw* btdebugdraw;
 	btStaticPlaneShape* plane;
-	// Custom debug interface
-	btIDebugDraw* BtDebugDraw;
-	// Dynamic bodies
-	TArray<btRigidBody*> BtRigidBodies;
-	// Static colliders
-	TArray<btCollisionObject*> BtStaticObjects;
+	btIDebugDraw* BtDebugDraw;	// Custom debug interface
+	
+	FCriticalSection BtCriticalSection; // one rigid body can be inserted at a time
+	TArray<btRigidBody*> BtRigidBodies;	// Dynamic bodies; this is where IDs will matter
+	
+	TArray<btCollisionObject*> BtStaticObjects;	// Static colliders
 	btCollisionObject* procbody;
-	// Re-usable collision shapes
 	TArray<btBoxShape*> BtBoxCollisionShapes;
 	TArray<btSphereShape*> BtSphereCollisionShapes;
 	TArray<btCapsuleShape*> BtCapsuleCollisionShapes;
 	btSequentialImpulseConstraintSolver* mt;
-	// Structure to hold re-usable ConvexHull shapes based on origin BodySetup / subindex / scale
-	struct ConvexHullShapeHolder
+	struct ConvexHullShapeHolder	// Structure to hold re-usable ConvexHull shapes based on origin BodySetup / subindex / scale
 	{
 		UBodySetup* BodySetup;
 		int HullIndex;
@@ -164,8 +132,7 @@ public:
 		btConvexHullShape* Shape;
 	};
 	TArray<ConvexHullShapeHolder> BtConvexHullCollisionShapes;
-	// These shapes are for *potentially* compound rigid body shapes
-	struct CachedDynamicShapeData
+	struct CachedDynamicShapeData	// These shapes are for *potentially* compound rigid body shapes
 	{
 		FName ClassName; // class name for cache
 		btCollisionShape* Shape;
@@ -175,8 +142,7 @@ public:
 	};
 	TArray<CachedDynamicShapeData> CachedDynamicShapes;
 
-	// This list can be edited in the level, linking to placed static actors
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Bullet Physics|Objects")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Bullet Physics|Objects") 	// This list can be edited in the level, linking to placed static actors
 		TArray<AActor*> PhysicsStaticActors1;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Bullet Physics|Objects")
 		TArray<AActor*> DynamicActors;
@@ -192,17 +158,13 @@ public:
 	// I chose not to use spinning / rolling friction in the end since it had issues!
 
 protected:
-	// Called when the game starts or when spawned
-	virtual void BeginPlay() override;
+	virtual void BeginPlay() override;	// Called when the game starts or when spawned
 
 public:	
-	// Called every frame
-	virtual void Tick(float DeltaTime) override;
+	virtual void Tick(float DeltaTime) override;	// Called every frame
 
 	void SetupStaticGeometryPhysics(TArray<AActor*> Actors, float Friction, float Restitution);
-
-	UFUNCTION(BlueprintCallable)
-	void activate();
+	
 	UFUNCTION(BlueprintCallable)
 	void AddStaticBody(AActor* player, float Friction, float Restitution,int &ID);
 	UFUNCTION(BlueprintCallable)
@@ -231,26 +193,17 @@ public:
 
 
 	void ExtractPhysicsGeometry(UStaticMeshComponent* SMC, const FTransform& InvActorXform, PhysicsGeometryCallback CB);
-
 	void ExtractPhysicsGeometry(UShapeComponent* Sc, const FTransform& InvActorXform, PhysicsGeometryCallback CB);
-
 	void ExtractPhysicsGeometry(const FTransform& XformSoFar, UBodySetup* BodySetup, PhysicsGeometryCallback CB);
-
 	btCollisionShape* GetBoxCollisionShape(const FVector& Dimensions);
-
 	btCollisionShape* GetSphereCollisionShape(float Radius);
-
 	btCollisionShape* GetCapsuleCollisionShape(float Radius, float Height);
-
 	btCollisionShape* GetTriangleMeshShape(TArray<FVector> a, TArray<FVector> b, TArray<FVector> c, TArray<FVector> d);
-	
-
 	btCollisionShape* GetConvexHullCollisionShape(UBodySetup* BodySetup, int ConvexIndex, const FVector& Scale);
 
 	const ATestActor::CachedDynamicShapeData& GetCachedDynamicShapeData(AActor* Actor, float Mass);
 
 	btRigidBody* AddRigidBody(AActor* Actor, const ATestActor::CachedDynamicShapeData& ShapeData, float Friction, float Restitution);
-
 	btRigidBody* AddRigidBody(AActor* Actor, btCollisionShape* CollisionShape, btVector3 Inertia, float Mass, float Friction, float Restitution);
 	UFUNCTION(BlueprintCallable)
 	void StepPhysics(float DeltaSeconds, int substeps);
@@ -264,71 +217,23 @@ public:
 	void ResetSim();
 
 	// networking code
-	
-	UFUNCTION(Server, Unreliable, BlueprintCallable)
-	void Server_SendInputsToServer(FBulletPlayerInput input);
-	
-	TMap<int32, btRigidBody*> PhysicsObjects;
+
+	// // Call this from blueprints to create a synced object
+	// UFUNCTION(Server, Reliable, BlueprintCallable)
+	// void SR_AddRigidBody(AActor* Body /* the pawn/actor */, float Friction, float Restitution, int ClientID,float mass);
 
 	UFUNCTION(BlueprintCallable)
-	bool StatesMatch(const FBulletSimulationState& A, const FBulletSimulationState& B) const;
+	FBulletSimulationState getState();
 	
-	UFUNCTION(BlueprintCallable)
-	void SaveCurrentState();
-	
-	UFUNCTION(BlueprintCallable)
-	void ConsumeInput();
-	
-	// send state to all clients
+	// send the physics state to the players
 	UFUNCTION(NetMulticast, Reliable, BlueprintCallable)
-	void MC_SendPhysicsStateToClient(FBulletSimulationState state);
-	
-	UFUNCTION(BlueprintCallable)
-	void StepPhysicsXFrames(int frames);
+	void MC_SendStateToClients(FBulletSimulationState serverState);
 
 	UFUNCTION(BlueprintCallable)
-	void ApplyObjectState(FBulletObjectState& ObjectState, const FBulletObjectState& DesiredState);
+	void Correct(FBulletSimulationState serverState);
 
-	// client corrects to the state of some frame on the server
+	// used for syncing frames between server and clients
 	UFUNCTION(BlueprintCallable)
-	void ClientCorrection(FBulletSimulationState state);
-
-	// HELPER FUNCTIONS FOR MEMORY AND OBJECT MANAGEMENT
+	int GetPingInFrames();
 	
-	void AddBodyToMap(int32 ObjectID, btRigidBody* Body)
-	{
-		PhysicsObjects.Add(ObjectID, Body);
-		UE_LOG(LogTemp, Warning, TEXT("Added Body to Map - ObjectID: %d, Body: %p"), ObjectID, Body);
-	}
-
-	void RemoveBodyFromMap(int32 ObjectID)
-	{
-		if (btRigidBody* Body = PhysicsObjects.FindRef(ObjectID))
-		{
-			// Clean up the Bullet rigid body
-			delete Body->getMotionState();
-			delete Body;
-		}
-		PhysicsObjects.Remove(ObjectID);
-	}
-
-	btRigidBody* GetBodyFromMap(int32 ObjectID) const
-	{
-		return PhysicsObjects.FindRef(ObjectID);
-	}
-	
-	void RemoveAllBodiesFromMap()
-	{
-
-		// Clean up all Bullet rigid bodies
-		for (auto& Pair : PhysicsObjects)
-		{
-			if (btRigidBody* Body = Pair.Value)
-			{
-				delete Body->getMotionState();
-				delete Body;
-			}
-		}
-		PhysicsObjects.Empty();
-	}
 };

@@ -55,56 +55,34 @@ void ATestActor::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 	
-	// if (HasAuthority())
-	// {
-	// 	ConsumeInput();
-	// } else
-	// {
-	// 	// FBulletPlayerInput input = GetPlayerInput(); // Get the current input
-	// 	// Server_SendInputsToServer(input);
-	// 	// ApplyInputToPhysics(input); // Predict the physics state locally
-	// }
-	StepPhysics(DeltaTime, 0);
-	if (HasAuthority())										// if server,
-	{
-		SaveCurrentState();
-		int count = CurrentState.ObjectStates.Num();
-
-		UE_LOG(LogTemp, Warning, TEXT("Sending %d ObjectStates to clients (BEFORE MC)"), CurrentState.ObjectStates.Num());
-
-		MC_SendPhysicsStateToClient(CurrentState);		// send state to clients
-	}
-	CurrentFrameNumber++;								// increment local frame number
+	CurrentFrameNumber++;
+	MC_SendStateToClients(getState());
+	
 	randvar = mt->getRandSeed();
 }
 
-void ATestActor::AddImpulse( int ID, FVector Impulse, FVector Location)
+void ATestActor::AddImpulse(int ID, FVector Impulse, FVector Location)
 {
 	BtRigidBodies[ID]->applyImpulse(BulletHelpers::ToBtDir(Impulse, true), BulletHelpers::ToBtPos(Location, GetActorLocation()));
 }
 
 // BEGIN NEW METHODS ####################################################
-
 void ATestActor::AddForce(int ID, FVector Force, FVector Location)
 {
 	BtRigidBodies[ID]->applyForce(BulletHelpers::ToBtDir(Force, true), BulletHelpers::ToBtPos(Location, GetActorLocation()));
 }
-
 void ATestActor::AddCentralForce(int ID, FVector Force)
 {
 	BtRigidBodies[ID]->applyCentralForce(BulletHelpers::ToBtDir(Force, true));
 }
-
 void ATestActor::AddTorque(int ID, FVector Torque)
 {
 	BtRigidBodies[ID]->applyTorque(BulletHelpers::ToBtDir(Torque, true));
 }
-
 void ATestActor::AddTorqueImpulse(int ID, FVector Torque)
 {
 	BtRigidBodies[ID]->applyTorqueImpulse(BulletHelpers::ToBtDir(Torque, true));
 }
-
 void ATestActor::GetVelocityAtLocation(int ID, FVector Location, FVector&Velocity)
 {
 	if (BtRigidBodies[ID]) {
@@ -112,208 +90,84 @@ void ATestActor::GetVelocityAtLocation(int ID, FVector Location, FVector&Velocit
 	}
 }
 
-// this will set the activation state to ACTIVE_TAG, so only use it on objects with that tag already
-void ATestActor::activate() {
-	if (procbody)
-		procbody->activate(true);
-}
+// NETWORKING
 
-// Networking code
-
-void ATestActor::Server_SendInputsToServer_Implementation(FBulletPlayerInput input)
+FBulletSimulationState ATestActor::getState()
 {
-	// on server
-	InputBuffer.Enqueue(input);
-}
+	FBulletSimulationState state;
+	state.FrameNumber = CurrentFrameNumber;
 
-void ATestActor::SaveCurrentState()
-{
-	CurrentState.ObjectStates.Empty();
-	CurrentState.FrameNumber = CurrentFrameNumber;
+	// TODO: populate simulation state with all object states
 
-	UE_LOG(LogTemp, Warning, TEXT("Number of PhysicsObjects: %d"), PhysicsObjects.Num());
-
-	for (const auto& Pair : PhysicsObjects)
+	for (int i = 0; i < BtRigidBodies.Num(); i++)
 	{
-		FBulletObjectState ObjectState;
-		const btRigidBody* Body = Pair.Value;
+		btRigidBody* body = BtRigidBodies[i];
+		FBulletObjectState os;
 
-		ObjectState.Transform = BulletHelpers::ToUE(Body->getWorldTransform(), GetActorLocation());
-		ObjectState.Velocity = BulletHelpers::ToUEDir(Body->getLinearVelocity(), true);
-		ObjectState.AngularVelocity = BulletHelpers::ToUEDir(Body->getAngularVelocity(), true);
-		ObjectState.FrameNumber = CurrentFrameNumber;
-
-		CurrentState.ObjectStates.Add(ObjectState);
-
-		// Log the saved state
-		UE_LOG(LogTemp, Warning, TEXT("Saved Object State - ObjectID: %d, FrameNumber: %d"), Pair.Key, ObjectState.FrameNumber);
-	}
-
-	History.Add(CurrentState);
-	if (History.Num() > 120) History.RemoveAt(0);
-}
-
-void ATestActor::ConsumeInput()
-{
-	FBulletPlayerInput Input;
-	while (InputBuffer.Dequeue(Input))
-	{
-		// Validate frame order
-		if (Input.FrameNumber <= CurrentFrameNumber)
-		{
-			UE_LOG(LogTemp, Warning, TEXT("Received stale input for frame %d"), Input.FrameNumber);
-			continue;
-		}
-
-		// Apply input to physics
-		// ApplyInputToPhysics(Input);
-
-		StepPhysics(FixedDeltaTime, 0);
-		SaveCurrentState();
-	}
-}
-
-bool ATestActor::StatesMatch(const FBulletSimulationState& A, const FBulletSimulationState& B) const
-{
-	// GEngine->AddOnScreenDebugMessage( 6,          // Key: Unique identifier for the message, -1 to display multiple times
-	// 	5.0f,        // Duration: Time in seconds the message stays on screen
-	// 	FColor::Green, // Color: Text color, e.g., FColor::Red, FColor::Green
-	// 	TEXT("Checking if physics states match") // Message: The string to display
-	// );
-	if (A.ObjectStates.Num() != B.ObjectStates.Num()) return false;
-    
-	for (int32 i = 0; i < A.ObjectStates.Num(); i++)
-	{
-		const FBulletObjectState& StateA = A.ObjectStates[i];
-		const FBulletObjectState& StateB = B.ObjectStates[i];
-        
-		if (!StateA.Transform.Equals(StateB.Transform)) return false;
-		if (!StateA.Velocity.Equals(StateB.Velocity)) return false;
-		if (!StateA.AngularVelocity.Equals(StateB.AngularVelocity)) return false;
-	}
-	return true;
-}
-
-void ATestActor::MC_SendPhysicsStateToClient_Implementation(FBulletSimulationState state)
-{
-	// // Find matching frame in history
-	// const FBulletSimulationState* ClientState = History.FindByPredicate(
-	// 	[&](const FBulletSimulationState& s) { return s.FrameNumber == state.FrameNumber; });
-
-	if (!HasAuthority())
-	{
-		UE_LOG(LogTemp, Warning, TEXT("Sending %d ObjectStates to clients"), state.ObjectStates.Num());
-		ClientCorrection(state);
-		History.Empty();
-		History.Add(state);
-		// GEngine->AddOnScreenDebugMessage( -1,
-		// 	5.0f,
-		// 	FColor::Green,
-		// 	TEXT("Physics states matched")
-		// );
-	}
-	
-	// // Are client and server states different?
-	// if (!ClientState || !StatesMatch(*ClientState, state)) 
-	// {
-	// 	ClientCorrection(state);
-	// 	History.Empty();
-	// 	History.Add(state);
-	// 	CurrentState = state;
-	// 	GEngine->AddOnScreenDebugMessage( 8,
-	// 		5.0f,
-	// 		FColor::Green,
-	// 		TEXT("Physics states didn't match!")
-	// 	);
-	// } else {
-	// 	// Keep server state on client as reference, delete if not needed
-	// 	History.Add(state);
-	// 	GEngine->AddOnScreenDebugMessage( 7,
-	// 		5.0f,
-	// 		FColor::Green,
-	// 		TEXT("Physics states matched") // Message: The string to display
-	// 	);
-	// }
-}
-
-// steps the physics simulation x frames to catch up
-void ATestActor::StepPhysicsXFrames(int frames)
-{
-	// GEngine->AddOnScreenDebugMessage( 2,          // Key: Unique identifier for the message, -1 to display multiple times
-	// 	5.0f,        // Duration: Time in seconds the message stays on screen
-	// 	FColor::Green, // Color: Text color, e.g., FColor::Red, FColor::Green
-	// 	TEXT("manually stepped physics sim") // Message: The string to display
-	// );
-	for (int i = 0; i < frames; i++)
-	{
-		StepPhysics(0.016666666 /* 60 frames per second */, 0);
-	}
-}
-
-void ATestActor::ClientCorrection(FBulletSimulationState state)
-{
-	// // Clear all forces and velocities on the client
-	// for (auto& Pair : PhysicsObjects)
-	// {
-	// 	btRigidBody* Body = Pair.Value;
-	// 	Body->clearForces();
-	// 	Body->setLinearVelocity(btVector3(0, 0, 0));
-	// 	Body->setAngularVelocity(btVector3(0, 0, 0));
-	// }
-	
-	// Apply the server's state to all objects
-	for (const FBulletObjectState& ObjectState : state.ObjectStates)
-	{
-		GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Green, TEXT("Applying Object State"));
-		if (btRigidBody* Body = PhysicsObjects.FindRef(ObjectState.ObjectID))
-		{
-			// Apply transform
-			Body->setWorldTransform(BulletHelpers::ToBt(ObjectState.Transform, {0, 0, 0}));
-	
-			// Apply velocities (ensure scaling is correct)
-			Body->setLinearVelocity(BulletHelpers::ToBtDir(ObjectState.Velocity, true)); // true = apply scaling
-			Body->setAngularVelocity(BulletHelpers::ToBtDir(ObjectState.AngularVelocity, true));
-	
-			// Reactivate the body
-			Body->activate(true);
-		} else
-		{
-			GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Green, TEXT("Did not find ObjectID in PhysicsObjects"));
-		}
-	}
-	GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Green, TEXT("Done"));
-
-	// Update the client's frame number to match the server
-	// CurrentFrameNumber = state.FrameNumber;
-}
-	
-// applies the DesiredState (from server) to ObjectState (on client)
-void ATestActor::ApplyObjectState(FBulletObjectState& ObjectState, const FBulletObjectState& DesiredState)
-{
-	if (btRigidBody* Body = PhysicsObjects.FindRef(ObjectState.ObjectID))
-	{
-		GEngine->AddOnScreenDebugMessage( -1,
-			5.0f,
-			FColor::Green,
-			TEXT("Applied object state")
-		);
+		// populate object state
+		os.Transform = BulletHelpers::ToUE(body->getWorldTransform(), GetActorLocation());
+		os.Velocity = BulletHelpers::ToUEDir(body->getLinearVelocity(), true);
+		os.AngularVelocity = BulletHelpers::ToUEDir(body->getAngularVelocity(), true);
+		os.Force = BulletHelpers::ToUEDir(body->getTotalForce(), true);
 		
-		// // Apply the state to the physics object
-		// Body->setWorldTransform(BulletHelpers::ToBt(DesiredState.Transform, {0,0,0}));
-		// Body->setLinearVelocity(BulletHelpers::ToBtDir(DesiredState.Velocity, false));
-		// Body->setAngularVelocity(BulletHelpers::ToBtDir(DesiredState.AngularVelocity, false));
-		// // Body->activate(true);
-	} else
-	{
-		GEngine->AddOnScreenDebugMessage( -1,          // Key: Unique identifier for the message, -1 to display multiple times
-			5.0f,        // Duration: Time in seconds the message stays on screen
-			FColor::Green, // Color: Text color, e.g., FColor::Red, FColor::Green
-			TEXT("Tried to apply object state") // Message: The string to display
-		);
+		state.insert(os, i); // insert objectstate at appropriate index
 	}
+	return state;
 }
+
+void ATestActor::MC_SendStateToClients_Implementation(FBulletSimulationState serverState)
+{
+	// TODO finish this
+	BtCriticalSection.Lock();
+
+	// do something for all bodies, this works
+	for (btRigidBody* i : BtRigidBodies) {
+		i->setLinearVelocity({0,0,0});
+	}
+	
+	for (int i = 0; i < serverState.ObjectStates.Num(); i++)
+	{
+		int32 clientID = *(ServerIdToClientId.Find(i));
+		BtRigidBodies[clientID]->setWorldTransform(BulletHelpers::ToBt((serverState.ObjectStates[i].Transform), GetActorLocation()));
+		BtRigidBodies[clientID]->setLinearVelocity(BulletHelpers::ToBtDir(serverState.ObjectStates[i].Velocity));
+		BtRigidBodies[clientID]->setAngularVelocity(BulletHelpers::ToBtDir(serverState.ObjectStates[i].AngularVelocity));
+		// BtRigidBodies[clientID]->applyForce(); // don't worry about force for now
+	}
+
+	// for (auto i : ServerIdToClientId)
+	// {
+	// 	// these are the same i think
+	// 	ServerIdToClientId.Find(i.Key());
+	// 	i.Value();
+	// }
+	
+	BtCriticalSection.Unlock();
+}
+
+void ATestActor::Correct(FBulletSimulationState serverState)
+{
+	// TODO set all physics objects to match the state of the server
+}
+
+int ATestActor::GetPingInFrames()
+{
+	// not implemented
+	// this may not be needed since the server can
+	// communicate ping through the multicast
+	// int x = FPlatformTime::Seconds();
+	return 60;
+}
+
 
 // END NEW METHODS
+
+
+
+
+
+
+
+
 
 void ATestActor::SetupStaticGeometryPhysics(TArray<AActor*> Actors, float Friction, float Restitution)
 {
@@ -329,7 +183,6 @@ void ATestActor::SetupStaticGeometryPhysics(TArray<AActor*> Actors, float Fricti
 			});
 	}
 }
-
 void ATestActor::AddStaticBody(AActor* Body, float Friction, float Restitution,int &ID)
 {
 		ExtractPhysicsGeometry(Body,[Body, this, Friction, Restitution](btCollisionShape* Shape, const FTransform& RelTransform)
@@ -341,7 +194,6 @@ void ATestActor::AddStaticBody(AActor* Body, float Friction, float Restitution,i
 		});
 	ID = BtWorld->getNumCollisionObjects() - 1;
 }
-
 void ATestActor::AddProcBody(AActor* Body,  float Friction, TArray<FVector> a, TArray<FVector> b, TArray<FVector> c, TArray<FVector> d, float Restitution, int& ID)
 {
 	btCollisionShape* Shape = GetTriangleMeshShape(a,b,c,d);
@@ -349,7 +201,6 @@ void ATestActor::AddProcBody(AActor* Body,  float Friction, TArray<FVector> a, T
 	 procbody=	AddStaticCollision(Shape, FinalXform, Friction, Restitution, Body);
 	ID = BtWorld->getNumCollisionObjects() - 1;
 }
-
 void ATestActor::UpdateProcBody(AActor* Body, float Friction, TArray<FVector> a, TArray<FVector> b, TArray<FVector> c, TArray<FVector> d, float Restitution, int& ID, int PrevID)
 {
 	BtWorld->removeCollisionObject(procbody);
@@ -361,19 +212,18 @@ void ATestActor::UpdateProcBody(AActor* Body, float Friction, TArray<FVector> a,
 	
 	ID = BtWorld->getNumCollisionObjects() - 1;
 }
-
-void ATestActor::AddRigidBody(AActor* Body, float Friction, float Restitution, int& ID,float mass)
+void ATestActor::AddRigidBody(AActor* Body /* the pawn/actor */, float Friction, float Restitution, int& ID,float mass)
 {
+	BtCriticalSection.Lock();
 	auto rbody = AddRigidBody(Body, GetCachedDynamicShapeData(Body, mass), Friction, Restitution);
 	ID = BtRigidBodies.Num() - 1;
-	AddBodyToMap(ID, rbody);
+	// AddBodyToMap(ID, rbody);
+	BtCriticalSection.Unlock();
 }
-
 void ATestActor::UpdatePlayertransform(AActor* player, int ID)
 {
 		BtWorld->getCollisionObjectArray()[ID]->setWorldTransform(BulletHelpers::ToBt(player->GetActorTransform(), GetActorLocation()));
 }
-
 void ATestActor::ExtractPhysicsGeometry(AActor* Actor, PhysicsGeometryCallback CB)
 {
 	TInlineComponentArray<UActorComponent*, 20> Components;
@@ -395,9 +245,8 @@ void ATestActor::ExtractPhysicsGeometry(AActor* Actor, PhysicsGeometryCallback C
 		ExtractPhysicsGeometry(Cast<UShapeComponent>(Comp), InvActorTransform, CB);
 	}
 }
-
 btCollisionObject* ATestActor::AddStaticCollision(btCollisionShape* Shape, const FTransform& Transform, float Friction,
-	float Restitution, AActor* Actor)
+float Restitution, AActor* Actor)
 {
 	btTransform Xform = BulletHelpers::ToBt(Transform, GetActorLocation());
 	btCollisionObject* Obj = new btCollisionObject();
@@ -413,7 +262,6 @@ btCollisionObject* ATestActor::AddStaticCollision(btCollisionShape* Shape, const
 	
 	return Obj;
 }
-
 void ATestActor::ExtractPhysicsGeometry(UStaticMeshComponent* SMC, const FTransform& InvActorXform, PhysicsGeometryCallback CB)
 {
 	UStaticMesh* Mesh = SMC->GetStaticMesh();
@@ -432,14 +280,12 @@ void ATestActor::ExtractPhysicsGeometry(UStaticMeshComponent* SMC, const FTransf
 	// So they use a mesh LOD for collision for complex shapes, never drawn usually?
 
 }
-
 void ATestActor::ExtractPhysicsGeometry(UShapeComponent* Sc, const FTransform& InvActorXform, PhysicsGeometryCallback CB)
 {
 	// We want the complete transform from actor to this component, not just relative to parent
 	FTransform CompFullRelXForm = Sc->GetComponentTransform() * InvActorXform;
 	ExtractPhysicsGeometry(CompFullRelXForm, Sc->ShapeBodySetup, CB);
 }
-
 void ATestActor::ExtractPhysicsGeometry(const FTransform& XformSoFar, UBodySetup* BodySetup, PhysicsGeometryCallback CB)
 {
 	FVector Scale = XformSoFar.GetScale3D();
@@ -487,7 +333,6 @@ void ATestActor::ExtractPhysicsGeometry(const FTransform& XformSoFar, UBodySetup
 	}
 
 }
-
 btCollisionShape* ATestActor::GetBoxCollisionShape(const FVector& Dimensions)
 {
 	// Simple brute force lookup for now, probably doesn't need anything more clever
@@ -502,7 +347,6 @@ btCollisionShape* ATestActor::GetBoxCollisionShape(const FVector& Dimensions)
 			return S;
 		}
 	}
-
 	// Not found, create
 	auto S = new btBoxShape(HalfSize);
 	// Get rid of margins, just cause issues for me
@@ -512,7 +356,6 @@ btCollisionShape* ATestActor::GetBoxCollisionShape(const FVector& Dimensions)
 	return S;
 
 }
-
 btCollisionShape* ATestActor::GetSphereCollisionShape(float Radius)
 {
 	// Simple brute force lookup for now, probably doesn't need anything more clever
@@ -525,17 +368,13 @@ btCollisionShape* ATestActor::GetSphereCollisionShape(float Radius)
 			return S;
 		}
 	}
-
 	// Not found, create
 	auto S = new btSphereShape(Rad);
 	// Get rid of margins, just cause issues for me
 	S->setMargin(0);
 	BtSphereCollisionShapes.Add(S);
-
 	return S;
-
 }
-
 btCollisionShape* ATestActor::GetCapsuleCollisionShape(float Radius, float Height)
 {
 	// Simple brute force lookup for now, probably doesn't need anything more clever
@@ -560,7 +399,6 @@ btCollisionShape* ATestActor::GetCapsuleCollisionShape(float Radius, float Heigh
 	return S;
 
 }
-
 btCollisionShape* ATestActor::GetTriangleMeshShape(TArray<FVector> a, TArray<FVector> b, TArray<FVector> c, TArray<FVector> d)
 {
 	btTriangleMesh* triangleMesh = new btTriangleMesh();
@@ -574,7 +412,6 @@ btCollisionShape* ATestActor::GetTriangleMeshShape(TArray<FVector> a, TArray<FVe
 	btBvhTriangleMeshShape* Trimesh= new btBvhTriangleMeshShape(triangleMesh,true);
 	return Trimesh;
 }
-
 btCollisionShape* ATestActor::GetConvexHullCollisionShape(UBodySetup* BodySetup, int ConvexIndex, const FVector& Scale)
 {
 	for (auto&& S : BtConvexHullCollisionShapes)
@@ -584,14 +421,13 @@ btCollisionShape* ATestActor::GetConvexHullCollisionShape(UBodySetup* BodySetup,
 			return S.Shape;
 		}
 	}
-
 	const FKConvexElem& Elem = BodySetup->AggGeom.ConvexElems[ConvexIndex];
 	auto C = new btConvexHullShape();
 	for (auto&& P : Elem.VertexData)
 	{
 		C->addPoint(BulletHelpers::ToBtPos(P, FVector::ZeroVector));
 	}
-	// Very important! Otherwise there's a gap between 
+	// Very important! Otherwise, there's a gap between 
 	C->setMargin(0);
 	// Apparently this is good to call?
 	C->initializePolyhedralFeatures();
@@ -605,14 +441,10 @@ btCollisionShape* ATestActor::GetConvexHullCollisionShape(UBodySetup* BodySetup,
 
 	return C;
 }
-
 const ATestActor::CachedDynamicShapeData& ATestActor::GetCachedDynamicShapeData(AActor* Actor, float Mass)
 {
 	// We re-use compound shapes based on (leaf) BP class
 	const FName ClassName = Actor->GetClass()->GetFName();
-
-	
-
 	// Because we want to support compound colliders, we need to extract all colliders first before
 	// constructing the final body.
 	TArray<btCollisionShape*, TInlineAllocator<20>> Shapes;
@@ -623,11 +455,8 @@ const ATestActor::CachedDynamicShapeData& ATestActor::GetCachedDynamicShapeData(
 			Shapes.Add(Shape);
 			ShapeRelXforms.Add(RelTransform);
 		});
-
-
 	CachedDynamicShapeData ShapeData;
 	ShapeData.ClassName = ClassName;
-
 	// Single shape with no transform is simplest
 	if (ShapeRelXforms.Num() == 1 &&
 		ShapeRelXforms[0].EqualsNoScale(FTransform::Identity))
@@ -646,7 +475,6 @@ const ATestActor::CachedDynamicShapeData& ATestActor::GetCachedDynamicShapeData(
 			// Note that btCompoundShape doesn't free child shapes, which is fine since they're tracked separately
 			CS->addChildShape(BulletHelpers::ToBt(ShapeRelXforms[i], FVector::ZeroVector), Shapes[i]);
 		}
-
 		ShapeData.Shape = CS;
 		ShapeData.bIsCompound = true;
 	}
@@ -661,18 +489,17 @@ const ATestActor::CachedDynamicShapeData& ATestActor::GetCachedDynamicShapeData(
 	return CachedDynamicShapes.Last();
 
 }
-
 btRigidBody* ATestActor::AddRigidBody(AActor* Actor, const ATestActor::CachedDynamicShapeData& ShapeData, float Friction, float Restitution)
 {
 	return AddRigidBody(Actor, ShapeData.Shape, ShapeData.Inertia, ShapeData.Mass, Friction, Restitution);
 }
 btRigidBody* ATestActor::AddRigidBody(AActor* Actor, btCollisionShape* CollisionShape, btVector3 Inertia, float Mass, float Friction, float Restitution)
 {
-	GEngine->AddOnScreenDebugMessage(        -1,          // Key: Unique identifier for the message, -1 to display multiple times
-		5.0f,        // Duration: Time in seconds the message stays on screen
-		FColor::Red, // Color: Text color, e.g., FColor::Red, FColor::Green
-		TEXT("A body was created") // Message: The string to display
-	);
+	// GEngine->AddOnScreenDebugMessage(        -1,          // Key: Unique identifier for the message, -1 to display multiple times
+	// 	5.0f,        // Duration: Time in seconds the message stays on screen
+	// 	FColor::Red, // Color: Text color, e.g., FColor::Red, FColor::Green
+	// 	TEXT("A body was created") // Message: The string to display
+	// );
 	auto Origin = GetActorLocation();
 	auto MotionState = new BulletCustomMotionState(Actor, Origin);
 	const btRigidBody::btRigidBodyConstructionInfo rbInfo(Mass*10, MotionState, CollisionShape, Inertia*10);
@@ -687,12 +514,10 @@ btRigidBody* ATestActor::AddRigidBody(AActor* Actor, btCollisionShape* Collision
 	return Body;
 	
 }
-
 void ATestActor::StepPhysics(float DeltaSeconds, int substeps)
 {
 	BtWorld->stepSimulation(DeltaSeconds, substeps, 1. / 60);
 }
-
 void ATestActor::SetPhysicsState(int ID, FTransform transforms, FVector Velocity, FVector AngularVelocity, FVector& Force)
 {
 	
@@ -703,7 +528,6 @@ void ATestActor::SetPhysicsState(int ID, FTransform transforms, FVector Velocity
 		//BtRigidBodies[ID]->apply(BulletHelpers::ToBtPos(Velocity, GetActorLocation()));
 	}
 }
-
 void ATestActor::GetPhysicsState(int ID, FTransform& transforms, FVector& Velocity, FVector& AngularVelocity, FVector& Force)
 {
 	if (BtRigidBodies[ID]) {
@@ -719,7 +543,6 @@ void ATestActor::GetPhysicsState(int ID, FTransform& transforms, FVector& Veloci
 		Force = BulletHelpers::ToUEDir(BtRigidBodies[ID]->getTotalForce(), true);
 	}
 }
-
 void ATestActor::ResetSim()
 {
 	
@@ -739,6 +562,4 @@ void ATestActor::ResetSim()
 	{
 		BtWorld->addRigidBody(BtRigidBodies[i]);
 	}
-	
-
 }
