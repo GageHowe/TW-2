@@ -72,6 +72,7 @@ public:
 		const FVector Pos = ToUEPos(T.getOrigin(), WorldOrigin);
 		return FTransform(Rot, Pos);
 	}
+	// for locations and rotations, hell yeah
 	static btTransform ToBt(const FTransform& T, const FVector& WorldOrigin)
 	{
 		return btTransform(

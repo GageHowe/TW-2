@@ -112,7 +112,6 @@ FBulletSimulationState ATestActor::getState()
 		
 		state.insert(os, i); // insert objectstate at appropriate index
 	}
-	
 	return state;
 }
 
@@ -129,9 +128,10 @@ void ATestActor::MC_SendStateToClients_Implementation(FBulletSimulationState ser
 	for (int i = 0; i < serverState.ObjectStates.Num(); i++)
 	{
 		int32 clientID = *(ServerIdToClientId.Find(i));
-		FVector newVel = serverState.ObjectStates[i].Velocity;
-		btVector3 btVel = BulletHelpers::ToBtDir(newVel);
-		BtRigidBodies[clientID]->setLinearVelocity(btVel);
+		BtRigidBodies[clientID]->setWorldTransform(BulletHelpers::ToBt((serverState.ObjectStates[i].Transform), GetActorLocation()));
+		BtRigidBodies[clientID]->setLinearVelocity(BulletHelpers::ToBtDir(serverState.ObjectStates[i].Velocity));
+		BtRigidBodies[clientID]->setAngularVelocity(BulletHelpers::ToBtDir(serverState.ObjectStates[i].AngularVelocity));
+		// BtRigidBodies[clientID]->applyForce(); // don't worry about force for now
 	}
 
 	// for (auto i : ServerIdToClientId)
@@ -347,7 +347,6 @@ btCollisionShape* ATestActor::GetBoxCollisionShape(const FVector& Dimensions)
 			return S;
 		}
 	}
-
 	// Not found, create
 	auto S = new btBoxShape(HalfSize);
 	// Get rid of margins, just cause issues for me
@@ -369,15 +368,12 @@ btCollisionShape* ATestActor::GetSphereCollisionShape(float Radius)
 			return S;
 		}
 	}
-
 	// Not found, create
 	auto S = new btSphereShape(Rad);
 	// Get rid of margins, just cause issues for me
 	S->setMargin(0);
 	BtSphereCollisionShapes.Add(S);
-
 	return S;
-
 }
 btCollisionShape* ATestActor::GetCapsuleCollisionShape(float Radius, float Height)
 {
