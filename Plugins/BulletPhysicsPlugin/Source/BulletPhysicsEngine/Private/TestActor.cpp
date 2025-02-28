@@ -65,7 +65,7 @@ void ATestActor::Tick(float DeltaTime)
 	// 	// ApplyInputToPhysics(input); // Predict the physics state locally
 	// }
 	StepPhysics(DeltaTime, 0);
-	SaveCurrentState();									// save state
+	// SaveCurrentState();									// save state
 	if (HasAuthority())										// if server,
 	{
 		MC_SendPhysicsStateToClient(CurrentState);		// send state to clients
