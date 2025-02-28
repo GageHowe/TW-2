@@ -55,6 +55,9 @@ void ATestActor::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 	
+	CurrentFrameNumber++;
+	MC_SendStateToClients(getState());
+	
 	randvar = mt->getRandSeed();
 }
 
@@ -91,12 +94,26 @@ void ATestActor::GetVelocityAtLocation(int ID, FVector Location, FVector&Velocit
 
 FBulletSimulationState ATestActor::getState()
 {
-	FBulletSimulationState thisState;
-	thisState.FrameNumber = CurrentFrameNumber;
+	FBulletSimulationState state;
+	state.FrameNumber = CurrentFrameNumber;
 
 	// TODO: populate simulation state with all object states
+
+	for (int i = 0; i < BtRigidBodies.Num(); i++)
+	{
+		btRigidBody* body = BtRigidBodies[i];
+		FBulletObjectState os;
+
+		// populate object state
+		os.Transform = BulletHelpers::ToUE(body->getWorldTransform(), GetActorLocation());
+		os.Velocity = BulletHelpers::ToUEDir(body->getLinearVelocity(), true);
+		os.AngularVelocity = BulletHelpers::ToUEDir(body->getAngularVelocity(), true);
+		os.Force = BulletHelpers::ToUEDir(body->getTotalForce(), true);
+		
+		state.insert(os, i); // insert objectstate at appropriate index
+	}
 	
-	return thisState;
+	return state;
 }
 
 void ATestActor::MC_SendStateToClients_Implementation(FBulletSimulationState serverState)
@@ -108,20 +125,21 @@ void ATestActor::MC_SendStateToClients_Implementation(FBulletSimulationState ser
 	for (btRigidBody* i : BtRigidBodies) {
 		i->setLinearVelocity({0,0,0});
 	}
-
-	for (auto j : BtRigidBodies)
-	{
-		
-	}
-
-	for (auto i : ServerIdToClientId)
-	{
-		// these are the same i think
-		ServerIdToClientId.Find(i.Key());
-		i.Value();
-	}
 	
-	ServerIdToClientId.Find(2);
+	for (int i = 0; i < serverState.ObjectStates.Num(); i++)
+	{
+		int32 clientID = *(ServerIdToClientId.Find(i));
+		FVector newVel = serverState.ObjectStates[i].Velocity;
+		btVector3 btVel = BulletHelpers::ToBtDir(newVel);
+		BtRigidBodies[clientID]->setLinearVelocity(btVel);
+	}
+
+	// for (auto i : ServerIdToClientId)
+	// {
+	// 	// these are the same i think
+	// 	ServerIdToClientId.Find(i.Key());
+	// 	i.Value();
+	// }
 	
 	BtCriticalSection.Unlock();
 }
@@ -407,14 +425,13 @@ btCollisionShape* ATestActor::GetConvexHullCollisionShape(UBodySetup* BodySetup,
 			return S.Shape;
 		}
 	}
-
 	const FKConvexElem& Elem = BodySetup->AggGeom.ConvexElems[ConvexIndex];
 	auto C = new btConvexHullShape();
 	for (auto&& P : Elem.VertexData)
 	{
 		C->addPoint(BulletHelpers::ToBtPos(P, FVector::ZeroVector));
 	}
-	// Very important! Otherwise there's a gap between 
+	// Very important! Otherwise, there's a gap between 
 	C->setMargin(0);
 	// Apparently this is good to call?
 	C->initializePolyhedralFeatures();
@@ -432,9 +449,6 @@ const ATestActor::CachedDynamicShapeData& ATestActor::GetCachedDynamicShapeData(
 {
 	// We re-use compound shapes based on (leaf) BP class
 	const FName ClassName = Actor->GetClass()->GetFName();
-
-	
-
 	// Because we want to support compound colliders, we need to extract all colliders first before
 	// constructing the final body.
 	TArray<btCollisionShape*, TInlineAllocator<20>> Shapes;
@@ -445,11 +459,8 @@ const ATestActor::CachedDynamicShapeData& ATestActor::GetCachedDynamicShapeData(
 			Shapes.Add(Shape);
 			ShapeRelXforms.Add(RelTransform);
 		});
-
-
 	CachedDynamicShapeData ShapeData;
 	ShapeData.ClassName = ClassName;
-
 	// Single shape with no transform is simplest
 	if (ShapeRelXforms.Num() == 1 &&
 		ShapeRelXforms[0].EqualsNoScale(FTransform::Identity))
@@ -468,7 +479,6 @@ const ATestActor::CachedDynamicShapeData& ATestActor::GetCachedDynamicShapeData(
 			// Note that btCompoundShape doesn't free child shapes, which is fine since they're tracked separately
 			CS->addChildShape(BulletHelpers::ToBt(ShapeRelXforms[i], FVector::ZeroVector), Shapes[i]);
 		}
-
 		ShapeData.Shape = CS;
 		ShapeData.bIsCompound = true;
 	}
@@ -556,6 +566,4 @@ void ATestActor::ResetSim()
 	{
 		BtWorld->addRigidBody(BtRigidBodies[i]);
 	}
-	
-
 }

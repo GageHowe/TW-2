@@ -46,18 +46,22 @@ USTRUCT(BlueprintType) // A FBulletObjectState is the instantaneous state of one
 struct FBulletObjectState
 {
 	GENERATED_BODY()
+
+	// depricated, simply insert objectstate to appropriate index of serverstate
+	// UPROPERTY(BlueprintReadWrite, Category = "Physics Networking")
+	// int32 ID;
 	
 	UPROPERTY(BlueprintReadWrite, Category = "Physics Networking")
-	int32 ID;
-	
-	UPROPERTY(BlueprintReadWrite, Category = "Physics Networking")
-	FVector Location;
+	FTransform Transform;
 
 	UPROPERTY(BlueprintReadWrite, Category = "Physics Networking")
 	FVector Velocity;
 
 	UPROPERTY(BlueprintReadWrite, Category = "Physics Networking")
 	FVector AngularVelocity;
+
+	UPROPERTY(BlueprintReadWrite, Category = "Physics Networking")
+	FVector Force;
 	
 };
 
