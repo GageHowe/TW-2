@@ -13,11 +13,13 @@
 #include "Components/ShapeComponent.h"
 #include <functional>
 #include "GameFramework/Actor.h"
+#include "ControllableInterface.h"
 #include "Net/UnrealNetwork.h"
+#include "ControllableInterface.h"
 #include "TestActor.generated.h"
 
 USTRUCT(BlueprintType)
-struct Ftris
+struct BULLETPHYSICSENGINE_API Ftris
 {
 	GENERATED_BODY()
 	FVector a;
@@ -25,59 +27,6 @@ struct Ftris
 	FVector c;
 	FVector d;
 
-};
-
-USTRUCT(BlueprintType)
-struct FBulletPlayerInput
-{
-	GENERATED_BODY()
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Physics Networking")
-		FVector MovementInput; // 0-1 on all axes, in local space (x,y,z)
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Physics Networking")
-		bool BoostInput; // 0-1
-
-	UPROPERTY(BlueprintReadWrite, Category = "Physics Networking")
-    	int32 FrameNumber; // Frame number for this input
-};
-
-USTRUCT(BlueprintType) // A FBulletObjectState is the instantaneous state of one object in a frame
-struct FBulletObjectState
-{
-	GENERATED_BODY()
-
-	// depricated, simply insert objectstate to appropriate index of serverstate
-	// UPROPERTY(BlueprintReadWrite, Category = "Physics Networking")
-	// int32 ID;
-	
-	UPROPERTY(BlueprintReadWrite, Category = "Physics Networking")
-	FTransform Transform;
-
-	UPROPERTY(BlueprintReadWrite, Category = "Physics Networking")
-	FVector Velocity;
-
-	UPROPERTY(BlueprintReadWrite, Category = "Physics Networking")
-	FVector AngularVelocity;
-
-	UPROPERTY(BlueprintReadWrite, Category = "Physics Networking")
-	FVector Force;
-	
-};
-
-USTRUCT(BlueprintType) // A FBulletSimulationState is an array of all object states
-struct FBulletSimulationState
-{
-	GENERATED_BODY()
-	UPROPERTY(BlueprintReadWrite, Category = "Physics Networking")
-	TArray<FBulletObjectState> ObjectStates;
-	UPROPERTY(BlueprintReadWrite, Category = "Physics Networking")
-	int32 FrameNumber;
-
-	void insert(FBulletObjectState obj, int num)
-	{
-		ObjectStates.Add(obj);
-	}
 };
 
 UCLASS()
@@ -89,7 +38,9 @@ public:
 	// Sets default values for this actor's properties
 	ATestActor();
 
-	TArray<TMpscQueue<FBulletPlayerInput>> InputBuffers;	// FIFO Buffers of inputs coming into the server
+	// Array of FIFO Buffers of inputs coming into the server
+	// Array index dictates the 
+	TArray<TMpscQueue<FBulletPlayerInput>> InputBuffers;
 
 	UPROPERTY(Blueprintable, BlueprintReadWrite, Category = "Physics Networking")
 	TMap<int32, int32> ServerIdToClientId; // Client-side mapping of server IDs to local IDs
@@ -229,9 +180,10 @@ public:
 	UFUNCTION(NetMulticast, Reliable, BlueprintCallable)
 	void MC_SendStateToClients(FBulletSimulationState serverState);
 
-	UFUNCTION(BlueprintCallable)
-	void Correct(FBulletSimulationState serverState);
-
+	// // one client sends its inputs to the server
+	// UFUNCTION(Server, Reliable, BlueprintCallable)
+	// void SR_SendInputToServer(FBulletPlayerInput);
+	
 	// used for syncing frames between server and clients
 	UFUNCTION(BlueprintCallable)
 	int GetPingInFrames();

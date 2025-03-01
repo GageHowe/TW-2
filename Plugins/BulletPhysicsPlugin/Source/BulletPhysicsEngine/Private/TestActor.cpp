@@ -1,6 +1,5 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
-
 #include "TestActor.h"
 
 #include "Types/AttributeStorage.h"
@@ -30,10 +29,8 @@ void ATestActor::BeginPlay()
 	BtWorld->setGravity(btVector3(0, 0, 0));
 	
 	BtWorld->setDebugDrawer(BtDebugDraw);
-	BtWorld->debugDrawWorld();
+	// BtWorld->debugDrawWorld();
 	// I mess with a few settings on BtWorld->getSolverInfo() but they're specific to my needs	
-
-	// Gravity vector in our units (1=1cm)
 	
 	//getSimulationIslandManager()->setSplitIslands(false);
 
@@ -155,14 +152,16 @@ void ATestActor::MC_SendStateToClients_Implementation(FBulletSimulationState ser
 	// 	ServerIdToClientId.Find(i.Key());
 	// 	i.Value();
 	// }
+
+	
 	
 	BtCriticalSection.Unlock();
 }
 
-void ATestActor::Correct(FBulletSimulationState serverState)
-{
-	// TODO set all physics objects to match the state of the server
-}
+// void ATestActor::SR_SendInputToServer_Implementation(FBulletPlayerInput)
+// {
+// 	
+// }
 
 int ATestActor::GetPingInFrames()
 {
