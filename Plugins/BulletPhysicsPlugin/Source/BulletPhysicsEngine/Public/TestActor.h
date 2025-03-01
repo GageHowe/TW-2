@@ -176,12 +176,6 @@ public:
 
 	UFUNCTION(BlueprintCallable)
 	FBulletSimulationState getState();
-
-	UFUNCTION(BlueprintCallable)
-	void SyncFrameWithServer()
-	{
-		FDateTime CurrentTime = FDateTime::Now();
-	}
 	
 	// send the physics state to the players
 	UFUNCTION(NetMulticast, Reliable, BlueprintCallable)
