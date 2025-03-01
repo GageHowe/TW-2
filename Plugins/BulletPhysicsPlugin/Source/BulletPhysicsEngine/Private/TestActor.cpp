@@ -57,31 +57,33 @@ void ATestActor::Tick(float DeltaTime)
 	
 	CurrentFrameNumber++;
 	MC_SendStateToClients(getState());
+
+	StepPhysics(DeltaTime, 0);
 	
 	randvar = mt->getRandSeed();
 }
 
 void ATestActor::AddImpulse(int ID, FVector Impulse, FVector Location)
 {
-	BtRigidBodies[ID]->applyImpulse(BulletHelpers::ToBtDir(Impulse, true), BulletHelpers::ToBtPos(Location, GetActorLocation()));
+	BtRigidBodies[ID]->applyImpulse(BulletHelpers::ToBtDir(Impulse, false), BulletHelpers::ToBtPos(Location, GetActorLocation()));
 }
 
 // BEGIN NEW METHODS ####################################################
 void ATestActor::AddForce(int ID, FVector Force, FVector Location)
 {
-	BtRigidBodies[ID]->applyForce(BulletHelpers::ToBtDir(Force, true), BulletHelpers::ToBtPos(Location, GetActorLocation()));
+	BtRigidBodies[ID]->applyForce(BulletHelpers::ToBtDir(Force, false), BulletHelpers::ToBtPos(Location, GetActorLocation()));
 }
 void ATestActor::AddCentralForce(int ID, FVector Force)
 {
-	BtRigidBodies[ID]->applyCentralForce(BulletHelpers::ToBtDir(Force, true));
+	BtRigidBodies[ID]->applyCentralForce(BulletHelpers::ToBtDir(Force, false));
 }
 void ATestActor::AddTorque(int ID, FVector Torque)
 {
-	BtRigidBodies[ID]->applyTorque(BulletHelpers::ToBtDir(Torque, true));
+	BtRigidBodies[ID]->applyTorque(BulletHelpers::ToBtDir(Torque, false));
 }
 void ATestActor::AddTorqueImpulse(int ID, FVector Torque)
 {
-	BtRigidBodies[ID]->applyTorqueImpulse(BulletHelpers::ToBtDir(Torque, true));
+	BtRigidBodies[ID]->applyTorqueImpulse(BulletHelpers::ToBtDir(Torque, false));
 }
 void ATestActor::GetVelocityAtLocation(int ID, FVector Location, FVector&Velocity)
 {
@@ -106,9 +108,9 @@ FBulletSimulationState ATestActor::getState()
 
 		// populate object state
 		os.Transform = BulletHelpers::ToUE(body->getWorldTransform(), GetActorLocation());
-		os.Velocity = BulletHelpers::ToUEDir(body->getLinearVelocity(), true);
-		os.AngularVelocity = BulletHelpers::ToUEDir(body->getAngularVelocity(), true);
-		os.Force = BulletHelpers::ToUEDir(body->getTotalForce(), true);
+		os.Velocity = BulletHelpers::ToUEDir(body->getLinearVelocity(), false);
+		os.AngularVelocity = BulletHelpers::ToUEDir(body->getAngularVelocity(), false);
+		os.Force = BulletHelpers::ToUEDir(body->getTotalForce(), false);
 		
 		state.insert(os, i); // insert objectstate at appropriate index
 	}
@@ -121,13 +123,25 @@ void ATestActor::MC_SendStateToClients_Implementation(FBulletSimulationState ser
 	BtCriticalSection.Lock();
 
 	// do something for all bodies, this works
-	for (btRigidBody* i : BtRigidBodies) {
-		i->setLinearVelocity({0,0,0});
-	}
+	// for (btRigidBody* i : BtRigidBodies) {
+	// 	i->setLinearVelocity({0,0,0});
+	// }
 	
 	for (int i = 0; i < serverState.ObjectStates.Num(); i++)
 	{
-		int32 clientID = *(ServerIdToClientId.Find(i));
+		// int32 clientID = *(ServerIdToClientId.Find(i));
+		int32* clientIDPtr = ServerIdToClientId.Find(i);
+		if (clientIDPtr == nullptr)
+		{
+			continue;
+		}
+		int32 clientID = *clientIDPtr;
+
+		if (!BtRigidBodies.IsValidIndex(clientID))
+		{
+			continue;
+		}
+		
 		BtRigidBodies[clientID]->setWorldTransform(BulletHelpers::ToBt((serverState.ObjectStates[i].Transform), GetActorLocation()));
 		BtRigidBodies[clientID]->setLinearVelocity(BulletHelpers::ToBtDir(serverState.ObjectStates[i].Velocity));
 		BtRigidBodies[clientID]->setAngularVelocity(BulletHelpers::ToBtDir(serverState.ObjectStates[i].AngularVelocity));
@@ -538,9 +552,9 @@ void ATestActor::GetPhysicsState(int ID, FTransform& transforms, FVector& Veloci
 			BtRigidBodies[ID]->getLinearVelocity().z());
 
 		transforms = BulletHelpers::ToUE(BtRigidBodies[ID]->getWorldTransform(), GetActorLocation());
-		Velocity = BulletHelpers::ToUEDir(BtRigidBodies[ID]->getLinearVelocity(), true);
-		AngularVelocity = BulletHelpers::ToUEDir(BtRigidBodies[ID]->getAngularVelocity(), true);
-		Force = BulletHelpers::ToUEDir(BtRigidBodies[ID]->getTotalForce(), true);
+		Velocity = BulletHelpers::ToUEDir(BtRigidBodies[ID]->getLinearVelocity(), false);
+		AngularVelocity = BulletHelpers::ToUEDir(BtRigidBodies[ID]->getAngularVelocity(), false);
+		Force = BulletHelpers::ToUEDir(BtRigidBodies[ID]->getTotalForce(), false);
 	}
 }
 void ATestActor::ResetSim()
