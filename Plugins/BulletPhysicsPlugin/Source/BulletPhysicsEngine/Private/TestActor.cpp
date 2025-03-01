@@ -93,72 +93,103 @@ void ATestActor::GetVelocityAtLocation(int ID, FVector Location, FVector&Velocit
 
 FBulletSimulationState ATestActor::getState()
 {
-
 	FBulletSimulationState state;
 	state.FrameNumber = CurrentFrameNumber;
-
-	// TODO: populate simulation state with all object states
 
 	for (int i = 0; i < BtRigidBodies.Num(); i++)
 	{
 		btRigidBody* body = BtRigidBodies[i];
 		FBulletObjectState os;
-
-		// populate object state
+		
 		os.Transform = BulletHelpers::ToUE(body->getWorldTransform(), GetActorLocation());
 		os.Velocity = BulletHelpers::ToUEDir(body->getLinearVelocity(), false);
 		os.AngularVelocity = BulletHelpers::ToUEDir(body->getAngularVelocity(), false);
 		os.Force = BulletHelpers::ToUEDir(body->getTotalForce(), false);
 		
-		state.insert(os, i); // insert objectstate at appropriate index
+		state.insert(os, i);
 	}
 	return state;
 }
 
 void ATestActor::MC_SendStateToClients_Implementation(FBulletSimulationState serverState)
 {
-	// TODO finish this
 	BtCriticalSection.Lock();
-
-	// do something for all bodies, this works
-	// for (btRigidBody* i : BtRigidBodies) {
-	// 	i->setLinearVelocity({0,0,0});
-	// }
 	
 	for (int i = 0; i < serverState.ObjectStates.Num(); i++)
 	{
-		// int32 clientID = *(ServerIdToClientId.Find(i));
+		// Checks
+
+		MapCriticalSection.Lock();
 		int32* clientIDPtr = ServerIdToClientId.Find(i);
+		MapCriticalSection.Unlock();
 		if (clientIDPtr == nullptr)
 		{
 			continue;
 		}
 		int32 clientID = *clientIDPtr;
-
 		if (!BtRigidBodies.IsValidIndex(clientID))
 		{
 			continue;
 		}
-		
+
+		int32 frame = serverState.FrameNumber;
+
+		// Sync; TODO: add prediction
 		BtRigidBodies[clientID]->setWorldTransform(BulletHelpers::ToBt((serverState.ObjectStates[i].Transform), GetActorLocation()));
 		BtRigidBodies[clientID]->setLinearVelocity(BulletHelpers::ToBtDir(serverState.ObjectStates[i].Velocity));
 		BtRigidBodies[clientID]->setAngularVelocity(BulletHelpers::ToBtDir(serverState.ObjectStates[i].AngularVelocity));
 		// BtRigidBodies[clientID]->applyForce(); // don't worry about force for now
 	}
 
-	// for (auto i : ServerIdToClientId)
-	// {
-	// 	// these are the same i think
-	// 	ServerIdToClientId.Find(i.Key());
-	// 	i.Value();
-	// }
-
-	
-	
 	BtCriticalSection.Unlock();
 }
+//
+// void ATestActor::EnqueueInput(FBulletPlayerInput Input, int32 ID)
+// {
+// 	InputBuffers[ID].Enqueue(Input);
+// 	GEngine->AddOnScreenDebugMessage(-1,
+// 		5.0f,
+// 		FColor::Red,
+// 		TEXT("Added input")
+// 	);
+// }
+//
+// void ATestActor::ConsumeInput(int32 ID)
+// {
+// 	// if (!InputBuffers.Contains(ID)) { return; }
+//
+// 	if (!InputBuffers.IsValidIndex(ID)) { return; }
+//
+// 	GEngine->AddOnScreenDebugMessage(-1,
+// 		5.0f,
+// 		FColor::Red,
+// 		TEXT("Valid!")
+// 	);
+// 	
+// 	TOptional<FBulletPlayerInput> optional = InputBuffers[ID].Dequeue();
+// 	if (optional.IsSet())
+// 	{
+// 		// Get the actual input value
+// 		FBulletPlayerInput input = optional.GetValue();
+//         
+// 		btRigidBody* body = BtRigidBodies[ID];
+// 		void* userPtr = body->getUserPointer();
+// 		AActor* actor = static_cast<AActor*>(userPtr);
+// 		
+// 		// Check if the actor implements the interface
+// 		if (actor && actor->GetClass()->ImplementsInterface(UControllableInterface::StaticClass()))
+// 		{
+// 			IControllableInterface::Execute_OnPlayerInput(actor, input);
+// 		}
+// 	} else
+// 	{
+// 		// do last input
+// 		// how? is it cached somewhere?
+// 	}
+// }
 
-// void ATestActor::SR_SendInputToServer_Implementation(FBulletPlayerInput)
+//
+// void ATestActor::ConsumeAllInputs()
 // {
 // 	
 // }
@@ -169,6 +200,7 @@ int ATestActor::GetPingInFrames()
 	// this may not be needed since the server can
 	// communicate ping through the multicast
 	// int x = FPlatformTime::Seconds();
+	
 	return 60;
 }
 

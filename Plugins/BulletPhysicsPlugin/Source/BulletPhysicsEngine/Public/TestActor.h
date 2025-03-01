@@ -41,9 +41,10 @@ public:
 	// Array of FIFO Buffers of inputs coming into the server
 	// Array index dictates the 
 	TArray<TMpscQueue<FBulletPlayerInput>> InputBuffers;
-
+	
 	UPROPERTY(Blueprintable, BlueprintReadWrite, Category = "Physics Networking")
 	TMap<int32, int32> ServerIdToClientId; // Client-side mapping of server IDs to local IDs
+	FCriticalSection MapCriticalSection;
 	
 	// current simulation state
 	// server sends this to client who sets their state to it and extrapolates from there
@@ -66,8 +67,8 @@ public:
 	btStaticPlaneShape* plane;
 	btIDebugDraw* BtDebugDraw;	// Custom debug interface
 	
-	FCriticalSection BtCriticalSection; // one rigid body can be inserted at a time
 	TArray<btRigidBody*> BtRigidBodies;	// Dynamic bodies; this is where IDs will matter
+	FCriticalSection BtCriticalSection;
 	
 	TArray<btCollisionObject*> BtStaticObjects;	// Static colliders
 	btCollisionObject* procbody;
@@ -175,16 +176,33 @@ public:
 
 	UFUNCTION(BlueprintCallable)
 	FBulletSimulationState getState();
+
+	UFUNCTION(BlueprintCallable)
+	void SyncFrameWithServer()
+	{
+		FDateTime CurrentTime = FDateTime::Now();
+	}
 	
 	// send the physics state to the players
 	UFUNCTION(NetMulticast, Reliable, BlueprintCallable)
 	void MC_SendStateToClients(FBulletSimulationState serverState);
-
+	//
+	// UFUNCTION(BlueprintCallable)
+	// void EnqueueInput(FBulletPlayerInput Input, int32 ID);
+	//
+	// UFUNCTION(BlueprintCallable)
+	// void ConsumeInput(int32 ID);
+	//
+	// UFUNCTION(BlueprintCallable)
+	// void ConsumeAllInputs();
+	//
 	// // one client sends its inputs to the server
+	// nevermind, this should be done by the pawn in blueprints
 	// UFUNCTION(Server, Reliable, BlueprintCallable)
-	// void SR_SendInputToServer(FBulletPlayerInput);
-	
+	// void SR_SendInputToServer(FBulletPlayerInput Input, AActor* Actor);
+	//
 	// used for syncing frames between server and clients
+	
 	UFUNCTION(BlueprintCallable)
 	int GetPingInFrames();
 	
