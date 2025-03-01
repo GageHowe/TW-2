@@ -96,6 +96,7 @@ void ATestActor::GetVelocityAtLocation(int ID, FVector Location, FVector&Velocit
 
 FBulletSimulationState ATestActor::getState()
 {
+
 	FBulletSimulationState state;
 	state.FrameNumber = CurrentFrameNumber;
 
