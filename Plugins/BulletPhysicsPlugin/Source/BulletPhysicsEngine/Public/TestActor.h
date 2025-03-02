@@ -179,7 +179,15 @@ public:
 	
 	// send the physics state to the players
 	UFUNCTION(NetMulticast, Reliable, BlueprintCallable)
-	void MC_SendStateToClients(FBulletSimulationState serverState);
+	void MC_SendStateToClients(FBulletSimulationState serverState, FDateTime time);
+
+	UFUNCTION(BlueprintCallable)
+	void StepPhysicsXFrames(float count)
+	{
+		for (int32 i = 0; i < count; i++)
+			StepPhysics(FixedDeltaTime, 0);
+	}
+
 	//
 	// UFUNCTION(BlueprintCallable)
 	// void EnqueueInput(FBulletPlayerInput Input, int32 ID);

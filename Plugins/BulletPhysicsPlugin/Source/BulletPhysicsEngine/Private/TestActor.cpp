@@ -53,7 +53,7 @@ void ATestActor::Tick(float DeltaTime)
 	Super::Tick(DeltaTime);
 	
 	CurrentFrameNumber++;
-	MC_SendStateToClients(getState());
+	MC_SendStateToClients(getState(), FDateTime::Now());
 
 	StepPhysics(DeltaTime, 0);
 	
@@ -111,7 +111,7 @@ FBulletSimulationState ATestActor::getState()
 	return state;
 }
 
-void ATestActor::MC_SendStateToClients_Implementation(FBulletSimulationState serverState)
+void ATestActor::MC_SendStateToClients_Implementation(FBulletSimulationState serverState, FDateTime serverTime)
 {
 	BtCriticalSection.Lock();
 	
@@ -132,7 +132,11 @@ void ATestActor::MC_SendStateToClients_Implementation(FBulletSimulationState ser
 			continue;
 		}
 
-		int32 frame = serverState.FrameNumber;
+		FDateTime clientTime = FDateTime::Now();
+		FTimespan diff = serverTime - clientTime;
+		
+		
+		StepPhysicsXFrames((diff.GetTotalSeconds()) * FixedDeltaTime);
 
 		// Sync; TODO: add prediction
 		BtRigidBodies[clientID]->setWorldTransform(BulletHelpers::ToBt((serverState.ObjectStates[i].Transform), GetActorLocation()));
@@ -206,14 +210,6 @@ int ATestActor::GetPingInFrames()
 
 
 // END NEW METHODS
-
-
-
-
-
-
-
-
 
 void ATestActor::SetupStaticGeometryPhysics(TArray<AActor*> Actors, float Friction, float Restitution)
 {
