@@ -1,10 +1,219 @@
+﻿// Fill out your copyright notice in the Description page of Project Settings.
+
+#pragma once
+
+#include "CoreMinimal.h"
+#include "PhysicsEngine/BodySetup.h"
+#include "Containers/Queue.h"
+#include "ThirdParty/BulletPhysicsEngineLibrary/BulletMinimal.h"
+#include "ThirdParty/BulletPhysicsEngineLibrary/src/bthelper.h"
+#include "ThirdParty/BulletPhysicsEngineLibrary/src/motionstate.h"
+#include "ThirdParty/BulletPhysicsEngineLibrary/src/BulletMain.h"
+#include "ThirdParty/BulletPhysicsEngineLibrary/debug/btdebug.h"
+#include "Components/ShapeComponent.h"
+#include <functional>
+#include "GameFramework/Actor.h"
+#include "ControllableInterface.h"
+#include "Net/UnrealNetwork.h"
+#include "ControllableInterface.h"
+#include "TestActor.generated.h"
+
+USTRUCT(BlueprintType)
+struct BULLETPHYSICSENGINE_API Ftris
+{
+	GENERATED_BODY()
+	FVector a;
+	FVector b;
+	FVector c;
+	FVector d;
+
+};
+
+UCLASS()
+class BULLETPHYSICSENGINE_API ATestActor : public AActor
+{
+	GENERATED_BODY()
+	
+public:	
+	// Sets default values for this actor's properties
+	ATestActor();
+
+	// Array of FIFO Buffers of inputs coming into the server
+	// Array index dictates the 
+	TArray<TMpscQueue<FBulletPlayerInput>> InputBuffers;
+	
+	UPROPERTY(Blueprintable, BlueprintReadWrite, Category = "Physics Networking")
+	TMap<int32, int32> ServerIdToClientId; // Client-side mapping of server IDs to local IDs
+	FCriticalSection MapCriticalSection;
+	
+	// current simulation state
+	// server sends this to client who sets their state to it and extrapolates from there
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Physics Networking")
+	FBulletSimulationState CurrentState;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Physics Networking")
+	int32 CurrentFrameNumber = 0;	// Global current frame number
+	const float FixedDeltaTime = 1.0f / 60.0f;
+	
+	// Bullet section
+	// Global objects
+	btCollisionConfiguration* BtCollisionConfig;
+	btCollisionDispatcher* BtCollisionDispatcher;
+	btBroadphaseInterface* BtBroadphase;
+	btConstraintSolver* BtConstraintSolver;
+	btDiscreteDynamicsWorld* BtWorld;
+	BulletHelpers* BulletHelpers;
+	BulletDebugDraw* btdebugdraw;
+	btStaticPlaneShape* plane;
+	btIDebugDraw* BtDebugDraw;	// Custom debug interface
+	
+	TArray<btRigidBody*> BtRigidBodies;	// Dynamic bodies; this is where IDs will matter
+	FCriticalSection BtCriticalSection;
+	
+	TArray<btCollisionObject*> BtStaticObjects;	// Static colliders
+	btCollisionObject* procbody;
+	TArray<btBoxShape*> BtBoxCollisionShapes;
+	TArray<btSphereShape*> BtSphereCollisionShapes;
+	TArray<btCapsuleShape*> BtCapsuleCollisionShapes;
+	btSequentialImpulseConstraintSolver* mt;
+	struct ConvexHullShapeHolder	// Structure to hold re-usable ConvexHull shapes based on origin BodySetup / subindex / scale
+	{
+		UBodySetup* BodySetup;
+		int HullIndex;
+		FVector Scale;
+		btConvexHullShape* Shape;
+	};
+	TArray<ConvexHullShapeHolder> BtConvexHullCollisionShapes;
+	struct CachedDynamicShapeData	// These shapes are for *potentially* compound rigid body shapes
+	{
+		FName ClassName; // class name for cache
+		btCollisionShape* Shape;
+		bool bIsCompound; // if true, this is a compound shape and so must be deleted
+		btScalar Mass;
+		btVector3 Inertia; // because we like to precalc this
+	};
+	TArray<CachedDynamicShapeData> CachedDynamicShapes;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Bullet Physics|Objects") 	// This list can be edited in the level, linking to placed static actors
+		TArray<AActor*> PhysicsStaticActors1;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Bullet Physics|Objects")
+		TArray<AActor*> DynamicActors;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Bullet Physics|Objects")
+		FString text="ra";
+	// These properties can only be edited in the Blueprint
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Bullet Physics|Objects")
+		float PhysicsStatic1Friction = 0.6;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Bullet Physics|Objects")
+		float PhysicsStatic1Restitution = 0.3;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Bullet Physics|Objects")
+		float randvar;
+	// I chose not to use spinning / rolling friction in the end since it had issues!
+
+protected:
+	virtual void BeginPlay() override;	// Called when the game starts or when spawned
+
+public:	
+	virtual void Tick(float DeltaTime) override;	// Called every frame
+
+	void SetupStaticGeometryPhysics(TArray<AActor*> Actors, float Friction, float Restitution);
+	
+	UFUNCTION(BlueprintCallable)
+	void AddStaticBody(AActor* player, float Friction, float Restitution,int &ID);
+	UFUNCTION(BlueprintCallable)
+	void AddProcBody(AActor* Body,  float Friction, TArray<FVector> a, TArray<FVector> b, TArray<FVector> c, TArray<FVector> d, float Restitution, int& ID);
+	UFUNCTION(BlueprintCallable)
+	void UpdateProcBody(AActor* Body, float Friction, TArray<FVector> a, TArray<FVector> b, TArray<FVector> c, TArray<FVector> d, float Restitution, int& ID, int PrevID);
+	UFUNCTION(BlueprintCallable)
+	void AddRigidBody(AActor* Body, float Friction, float Restitution, int& ID,float mass);
+	UFUNCTION(BlueprintCallable)
+	void UpdatePlayertransform(AActor* player, int ID);
+	UFUNCTION(BlueprintCallable)
+	void AddImpulse( int ID, FVector Impulse, FVector Location);
+	typedef const std::function<void(btCollisionShape* /*SingleShape*/, const FTransform& /*RelativeXform*/)>& PhysicsGeometryCallback;
+	UFUNCTION(BlueprintCallable)
+	void AddForce(int ID, FVector Force, FVector Location);
+	UFUNCTION(BlueprintCallable)
+	void AddCentralForce(int ID, FVector Force);
+	UFUNCTION(BlueprintCallable)
+	void AddTorque(int ID, FVector Torque);
+	UFUNCTION(BlueprintCallable)
+	void AddTorqueImpulse(int ID, FVector Torque);
+	typedef const std::function<void(btCollisionShape* /*SingleShape*/, const FTransform& /*RelativeXform*/)>& PhysicsGeometryCallback;
+	void ExtractPhysicsGeometry(AActor* Actor, PhysicsGeometryCallback CB);
+
+	btCollisionObject* AddStaticCollision(btCollisionShape* Shape, const FTransform& Transform, float Friction, float Restitution, AActor* Actor);
+
+
+	void ExtractPhysicsGeometry(UStaticMeshComponent* SMC, const FTransform& InvActorXform, PhysicsGeometryCallback CB);
+	void ExtractPhysicsGeometry(UShapeComponent* Sc, const FTransform& InvActorXform, PhysicsGeometryCallback CB);
+	void ExtractPhysicsGeometry(const FTransform& XformSoFar, UBodySetup* BodySetup, PhysicsGeometryCallback CB);
+	btCollisionShape* GetBoxCollisionShape(const FVector& Dimensions);
+	btCollisionShape* GetSphereCollisionShape(float Radius);
+	btCollisionShape* GetCapsuleCollisionShape(float Radius, float Height);
+	btCollisionShape* GetTriangleMeshShape(TArray<FVector> a, TArray<FVector> b, TArray<FVector> c, TArray<FVector> d);
+	btCollisionShape* GetConvexHullCollisionShape(UBodySetup* BodySetup, int ConvexIndex, const FVector& Scale);
+
+	const ATestActor::CachedDynamicShapeData& GetCachedDynamicShapeData(AActor* Actor, float Mass);
+
+	btRigidBody* AddRigidBody(AActor* Actor, const ATestActor::CachedDynamicShapeData& ShapeData, float Friction, float Restitution);
+	btRigidBody* AddRigidBody(AActor* Actor, btCollisionShape* CollisionShape, btVector3 Inertia, float Mass, float Friction, float Restitution);
+	UFUNCTION(BlueprintCallable)
+	void StepPhysics(float DeltaSeconds, int substeps);
+	UFUNCTION(BlueprintCallable)
+	void SetPhysicsState(int ID, FTransform transforms, FVector Velocity, FVector AngularVelocity,FVector& Force);
+	UFUNCTION(BlueprintCallable)
+	void GetPhysicsState(int ID, FTransform& transforms, FVector& Velocity, FVector& AngularVelocity, FVector& Force);
+	UFUNCTION(BlueprintCallable)
+	void GetVelocityAtLocation(int ID, FVector Location, FVector& Velocity);
+	UFUNCTION(BlueprintCallable)
+	void ResetSim();
+
+	// networking code
+
+	// // Call this from blueprints to create a synced object
+	// UFUNCTION(Server, Reliable, BlueprintCallable)
+	// void SR_AddRigidBody(AActor* Body /* the pawn/actor */, float Friction, float Restitution, int ClientID,float mass);
+
+	UFUNCTION(BlueprintCallable)
+	FBulletSimulationState getState();
+	
+	// send the physics state to the players
+	UFUNCTION(NetMulticast, Reliable, BlueprintCallable)
+	void MC_SendStateToClients(FBulletSimulationState serverState, FDateTime time);
+
+	UFUNCTION(BlueprintCallable)
+	void StepPhysicsXFrames(float count)
+	{
+		for (int32 i = 0; i < count; i++)
+			StepPhysics(FixedDeltaTime, 0);
+	}
+
+	//
+	// UFUNCTION(BlueprintCallable)
+	// void EnqueueInput(FBulletPlayerInput Input, int32 ID);
+	//
+	// UFUNCTION(BlueprintCallable)
+	// void ConsumeInput(int32 ID);
+	//
+	// UFUNCTION(BlueprintCallable)
+	// void ConsumeAllInputs();
+	//
+	// // one client sends its inputs to the server
+	// nevermind, this should be done by the pawn in blueprints
+	// UFUNCTION(Server, Reliable, BlueprintCallable)
+	// void SR_SendInputToServer(FBulletPlayerInput Input, AActor* Actor);
+	//
+	// used for syncing frames between server and clients
+	
+	UFUNCTION(BlueprintCallable)
+	int GetPingInFrames();
+	
+};
+
+
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #include "TestActor.h"
-#include "Types/AttributeStorage.h"
-#include "Net/UnrealNetwork.h"
-#include "Engine/World.h"
-#include "GameFramework/GameStateBase.h"
 
 #include "Types/AttributeStorage.h"
 
@@ -13,13 +222,7 @@
 ATestActor::ATestActor()
 {
 	PrimaryActorTick.bCanEverTick = true;
-	
-	// Make this actor replicate
-	bReplicates = true;
-	bAlwaysRelevant = true;
-	
-	// For deterministic physics
-	PhysicsAccumulator = 0.0f;
+	// BtDebugDraw = new BulletDebugDraw(GetWorld(), GetActorLocation());
 }
 
 // Called when the game starts or when spawned
@@ -27,26 +230,34 @@ void ATestActor::BeginPlay()
 {
 	Super::BeginPlay();
 
-	// Setup Bullet Physics
 	BtCollisionConfig = new btDefaultCollisionConfiguration();
+	
 	BtCollisionDispatcher = new btCollisionDispatcher(BtCollisionConfig);
 	BtBroadphase = new btDbvtBroadphase();
 	mt = new btSequentialImpulseConstraintSolver;
-	
-	// Set fixed random seed for deterministic physics
-	mt->setRandSeed(12345);
+	mt->setRandSeed(1234);
 	BtConstraintSolver = mt;
 	
 	BtWorld = new btDiscreteDynamicsWorld(BtCollisionDispatcher, BtBroadphase, BtConstraintSolver, BtCollisionConfig);
-	BtWorld->setGravity(btVector3(0, 0, -980.0)); // -9.8 m/s^2 in Unreal units
+	BtWorld->setGravity(btVector3(0, 0, 0));
 	
-	// Disable deactivation for deterministic physics
-	BtWorld->getDispatchInfo().m_allowedCcdPenetration = 0.0001f;
-	BtWorld->getSolverInfo().m_numIterations = 10;
-	BtWorld->getSolverInfo().m_solverMode = SOLVER_SIMD | SOLVER_USE_WARMSTARTING;
+	BtWorld->setDebugDrawer(BtDebugDraw);
+	// BtWorld->debugDrawWorld();
+	// I mess with a few settings on BtWorld->getSolverInfo() but they're specific to my needs	
 	
-	// Initialize state tracking
-	CurrentFrameNumber = 0;
+	//getSimulationIslandManager()->setSplitIslands(false);
+
+	// example of adding a plane in c++
+	/*
+	plane = new btStaticPlaneShape(btVector3(0, 0, 1), 0);
+	btTransform t;
+	t.setIdentity();
+	t.setOrigin(btVector3(0, 0, 0));
+	auto MotionState = new btDefaultMotionState(t);
+	btRigidBody::btRigidBodyConstructionInfo info(0.0, MotionState, plane);
+	btRigidBody* body = new btRigidBody(info);
+	BtWorld->addRigidBody(body);*/
+
 }
 
 // Called every frame
@@ -54,428 +265,12 @@ void ATestActor::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 	
-	// Fixed timestep physics simulation
-	PhysicsAccumulator += DeltaTime;
+	CurrentFrameNumber++;
+	MC_SendStateToClients(getState(), FDateTime::Now());
+
+	StepPhysics(DeltaTime, 0);
 	
-	// Run as many fixed physics steps as needed to catch up
-	while (PhysicsAccumulator >= FixedDeltaTime)
-	{
-		// Process inputs from all clients
-		if (HasAuthority()) // Server-only
-		{
-			for (auto& Pair : ClientInputBuffers)
-			{
-				FBulletPlayerInput Input;
-				// Process one input per physics step
-				if (Pair.Value.Peek(Input))
-				{
-					// Only process if this is the correct frame or newer
-					if (Input.FrameNumber <= CurrentFrameNumber)
-					{
-						Pair.Value.Dequeue(Input);
-						ApplyInput(Input);
-					}
-				}
-			}
-		}
-		
-		// Step simulation
-		StepPhysics(FixedDeltaTime, 0);
-		PhysicsAccumulator -= FixedDeltaTime;
-		CurrentFrameNumber++;
-		
-		// Record state for reconciliation
-		RecordState();
-		
-		// Server sends state updates to clients
-		if (HasAuthority() && (CurrentFrameNumber % 2 == 0)) // Send every other frame to save bandwidth
-		{
-			MC_SendStateToClients(GetSerializableState());
-		}
-	}
-}
-
-void ATestActor::RecordState()
-{
-	FBulletSimulationState State;
-	State.FrameNumber = CurrentFrameNumber;
-	
-	// Record all dynamic objects
-	for (int32 i = 0; i < BtRigidBodies.Num(); i++)
-	{
-		btRigidBody* Body = BtRigidBodies[i];
-		if (Body)
-		{
-			FBulletObjectState ObjectState;
-			ObjectState.ObjectID = i;
-			ObjectState.Transform = BulletHelpers::ToUE(Body->getWorldTransform(), GetActorLocation());
-			ObjectState.Velocity = BulletHelpers::ToUEDir(Body->getLinearVelocity(), false);
-			ObjectState.AngularVelocity = BulletHelpers::ToUEDir(Body->getAngularVelocity(), false);
-			ObjectState.Force = BulletHelpers::ToUEDir(Body->getTotalForce(), false);
-			
-			State.ObjectStates.Add(ObjectState);
-		}
-	}
-	
-	// Store in cache
-	StateCache.AddState(State);
-}
-
-FBulletSimulationState ATestActor::GetCurrentState()
-{
-    FBulletSimulationState State;
-    State.FrameNumber = this->CurrentFrameNumber;
-    
-    // Capture all rigid body states
-    BtCriticalSection.Lock();
-    for (int32 i = 0; i < this->BtRigidBodies.Num(); i++)
-    {
-        btRigidBody* Body = this->BtRigidBodies[i];
-        if (Body)
-        {
-            FBulletObjectState ObjectState;
-            ObjectState.ObjectID = i;
-            ObjectState.Transform = BulletHelpers::ToUE(Body->getWorldTransform(), this->GetActorLocation());
-            ObjectState.Velocity = BulletHelpers::ToUEDir(Body->getLinearVelocity(), false);
-            ObjectState.AngularVelocity = BulletHelpers::ToUEDir(Body->getAngularVelocity(), false);
-            ObjectState.Force = BulletHelpers::ToUEDir(Body->getTotalForce(), false);
-            
-            State.ObjectStates.Add(ObjectState);
-        }
-    }
-    BtCriticalSection.Unlock();
-    
-    return State;
-}
-
-FBulletSimulationState ATestActor::GetSerializableState()
-{
-    // Create a smaller, network-optimized version of the state
-    FBulletSimulationState State = GetCurrentState();
-    
-    // Filter out inactive objects to save bandwidth
-    State.ObjectStates.RemoveAll([](const FBulletObjectState& ObjectState) {
-        // Only include objects that moved significantly
-        return ObjectState.Velocity.SizeSquared() < 0.1f && 
-               ObjectState.AngularVelocity.SizeSquared() < 0.1f;
-    });
-    
-    return State;
-}
-
-void ATestActor::ProcessClientInput(const FBulletPlayerInput& Input)
-{
-    // Only process inputs for this client's controlled objects
-    if (!HasAuthority()) // Client-side prediction
-    {
-        // Only process if we own this object
-        // Use the client-to-server ID mapping
-        MapCriticalSection.Lock();
-        int32* ServerID = ClientIdToServerId.Find(Input.ObjectID);
-        MapCriticalSection.Unlock();
-        
-        if (ServerID != nullptr)
-        {
-            // Apply the input immediately
-            FBulletPlayerInput AdjustedInput = Input;
-            AdjustedInput.ObjectID = *ServerID;
-            ApplyInput(AdjustedInput);
-        }
-    }
-    else // Server authority
-    {
-        // For server, we use the input as-is
-        ApplyInput(Input);
-    }
-}
-
-void ATestActor::ApplyInput(const FBulletPlayerInput& Input)
-{
-    // Check if the object ID is valid
-    if (!BtRigidBodies.IsValidIndex(Input.ObjectID) || !BtRigidBodies[Input.ObjectID])
-    {
-        return;
-    }
-    
-    btRigidBody* Body = BtRigidBodies[Input.ObjectID];
-    
-    // Apply movement input
-    if (!Input.MovementInput.IsNearlyZero())
-    {
-        // Convert local input to world space
-        FTransform BodyTransform = BulletHelpers::ToUE(Body->getWorldTransform(), GetActorLocation());
-        FVector WorldForce = BodyTransform.TransformVector(Input.MovementInput * 1000.0f); // Scale force
-        
-        Body->applyCentralForce(BulletHelpers::ToBtDir(WorldForce, false));
-    }
-    
-    // Apply ability input
-    if (Input.Ability)
-    {
-        // Add a jump impulse
-        Body->applyCentralImpulse(btVector3(0, 0, 500.0f));
-    }
-    
-    // Get the actor this body represents
-    AActor* ControlledActor = static_cast<AActor*>(Body->getUserPointer());
-    
-    // If actor implements the controllable interface, pass input to it
-    if (ControlledActor && ControlledActor->GetClass()->ImplementsInterface(UControllableInterface::StaticClass()))
-    {
-        IControllableInterface::Execute_OnPlayerInput(ControlledActor, Input);
-    }
-}
-
-void ATestActor::EnqueueInput(const FBulletPlayerInput& Input, int32 ClientID)
-{
-    // Get or create input buffer for this client
-    FInputBuffer& Buffer = ClientInputBuffers.FindOrAdd(ClientID);
-    
-    // Add input to buffer
-    Buffer.Enqueue(Input);
-}
-
-void ATestActor::Server_SendInput_Implementation(const TArray<FBulletPlayerInput>& Inputs)
-{
-    // Process all inputs from a client
-    for (const FBulletPlayerInput& Input : Inputs)
-    {
-        EnqueueInput(Input, Input.ObjectID);
-    }
-}
-
-void ATestActor::MC_SendStateToClients_Implementation(FBulletSimulationState ServerState)
-{
-    // On server, just record that we sent this state
-    if (HasAuthority())
-    {
-        return;
-    }
-    
-    // On client, handle state reconciliation
-    ReconcileState(ServerState);
-}
-
-// Original function from the example code, keeping for compatibility but will be removed
-void ATestActor::MC_SendStateToClients_Implementation(FBulletSimulationState serverState, FDateTime time)
-{
-    BtCriticalSection.Lock();
-    
-    for (int i = 0; i < serverState.ObjectStates.Num(); i++)
-    {
-        // Checks
-        MapCriticalSection.Lock();
-        int32* clientIDPtr = ServerIdToClientId.Find(i);
-        MapCriticalSection.Unlock();
-        if (clientIDPtr == nullptr)
-        {
-            continue;
-        }
-        int32 clientID = *clientIDPtr;
-        if (!BtRigidBodies.IsValidIndex(clientID))
-        {
-            continue;
-        }
-
-        FDateTime clientTime = FDateTime::Now();
-        FTimespan diff = time - clientTime;
-        
-        StepPhysicsXFrames(FMath::CeilToInt((diff.GetTotalSeconds()) / FixedDeltaTime));
-
-        // Sync; TODO: add prediction
-        BtRigidBodies[clientID]->setWorldTransform(BulletHelpers::ToBt(serverState.ObjectStates[i].Transform, GetActorLocation()));
-        BtRigidBodies[clientID]->setLinearVelocity(BulletHelpers::ToBtDir(serverState.ObjectStates[i].Velocity));
-        BtRigidBodies[clientID]->setAngularVelocity(BulletHelpers::ToBtDir(serverState.ObjectStates[i].AngularVelocity));
-        // BtRigidBodies[clientID]->applyForce(); // don't worry about force for now
-    }
-
-    BtCriticalSection.Unlock();
-}
-
-void ATestActor::ReconcileState(const FBulletSimulationState& ServerState)
-{
-    // Skip reconciliation if we're already reconciling
-    if (bIsReconciling || ServerState.FrameNumber <= LastReconcileFrame)
-    {
-        return;
-    }
-    
-    // Find our cached state for this frame
-    FBulletSimulationState* CachedState = StateCache.GetState(ServerState.FrameNumber);
-    if (!CachedState)
-    {
-        // State is too old, just apply directly
-        for (const FBulletObjectState& ServerObjectState : ServerState.ObjectStates)
-        {
-            if (BtRigidBodies.IsValidIndex(ServerObjectState.ObjectID) && BtRigidBodies[ServerObjectState.ObjectID])
-            {
-                btRigidBody* Body = BtRigidBodies[ServerObjectState.ObjectID];
-                
-                Body->setWorldTransform(BulletHelpers::ToBt(ServerObjectState.Transform, GetActorLocation()));
-                Body->setLinearVelocity(BulletHelpers::ToBtDir(ServerObjectState.Velocity, false));
-                Body->setAngularVelocity(BulletHelpers::ToBtDir(ServerObjectState.AngularVelocity, false));
-            }
-        }
-        return;
-    }
-    
-    // Check for significant differences that require reconciliation
-    bool NeedsReconciliation = false;
-    for (const FBulletObjectState& ServerObjectState : ServerState.ObjectStates)
-    {
-        FBulletObjectState* CachedObjectState = CachedState->GetObjectState(ServerObjectState.ObjectID);
-        if (CachedObjectState && CachedObjectState->RequiresCorrection(ServerObjectState))
-        {
-            NeedsReconciliation = true;
-            break;
-        }
-    }
-    
-    if (!NeedsReconciliation)
-    {
-        return;
-    }
-    
-    UE_LOG(LogTemp, Warning, TEXT("Reconciling physics from frame %d to %d"), 
-        ServerState.FrameNumber, CurrentFrameNumber);
-    
-    // Begin reconciliation process
-    bIsReconciling = true;
-    
-    // Save current state for restoration
-    FBulletSimulationState CurrentClientState = GetCurrentState();
-    
-    // 1. Set state to match server's authoritative state
-    for (const FBulletObjectState& ServerObjectState : ServerState.ObjectStates)
-    {
-        if (BtRigidBodies.IsValidIndex(ServerObjectState.ObjectID) && BtRigidBodies[ServerObjectState.ObjectID])
-        {
-            btRigidBody* Body = BtRigidBodies[ServerObjectState.ObjectID];
-            
-            Body->setWorldTransform(BulletHelpers::ToBt(ServerObjectState.Transform, GetActorLocation()));
-            Body->setLinearVelocity(BulletHelpers::ToBtDir(ServerObjectState.Velocity, false));
-            Body->setAngularVelocity(BulletHelpers::ToBtDir(ServerObjectState.AngularVelocity, false));
-        }
-    }
-    
-    // 2. Replay inputs from this frame up to current
-    int32 ReplayStartFrame = ServerState.FrameNumber + 1;
-    for (int32 Frame = ReplayStartFrame; Frame <= CurrentFrameNumber; Frame++)
-    {
-        // Apply all cached inputs for this frame
-        for (auto& Pair : ClientInputBuffers)
-        {
-            FBulletPlayerInput Input;
-            if (Pair.Value.Peek(Input) && Input.FrameNumber == Frame)
-            {
-                ApplyInput(Input);
-                Pair.Value.Dequeue(Input);
-            }
-        }
-        
-        // Step physics
-        StepPhysics(FixedDeltaTime, 0);
-        
-        // Record reconciled state
-        RecordState();
-    }
-    
-    // Reconciliation complete
-    bIsReconciling = false;
-    LastReconcileFrame = ServerState.FrameNumber;
-}
-
-TArray<FBulletPlayerInput> ATestActor::CompressInputs(const TArray<FBulletPlayerInput>& Inputs)
-{
-    TArray<FBulletPlayerInput> CompressedInputs;
-    
-    if (Inputs.Num() == 0)
-    {
-        return CompressedInputs;
-    }
-    
-    FBulletPlayerInput CurrentInput = Inputs[0];
-    CurrentInput.DuplicateCount = 1;
-    
-    for (int32 i = 1; i < Inputs.Num(); i++)
-    {
-        const FBulletPlayerInput& Input = Inputs[i];
-        
-        // If input is the same, increment duplicate count
-        if (Input == CurrentInput && Input.FrameNumber == CurrentInput.FrameNumber + CurrentInput.DuplicateCount)
-        {
-            CurrentInput.DuplicateCount++;
-        }
-        else
-        {
-            // Add current input and start new one
-            CompressedInputs.Add(CurrentInput);
-            CurrentInput = Input;
-            CurrentInput.DuplicateCount = 1;
-        }
-    }
-    
-    // Add the last processed input
-    CompressedInputs.Add(CurrentInput);
-    
-    return CompressedInputs;
-}
-
-TArray<FBulletPlayerInput> ATestActor::DecompressInputs(const TArray<FBulletPlayerInput>& CompressedInputs)
-{
-    TArray<FBulletPlayerInput> DecompressedInputs;
-    
-    for (const FBulletPlayerInput& Input : CompressedInputs)
-    {
-        // Add the original input
-        FBulletPlayerInput BaseInput = Input;
-        BaseInput.DuplicateCount = 1;
-        
-        // Decompress by repeating for the duplicate count
-        for (uint8 i = 0; i < Input.DuplicateCount; i++)
-        {
-            FBulletPlayerInput DuplicateInput = BaseInput;
-            DuplicateInput.FrameNumber = Input.FrameNumber + i;
-            DecompressedInputs.Add(DuplicateInput);
-        }
-    }
-    
-    return DecompressedInputs;
-}
-
-TArray<FBulletPlayerInput> ATestActor::GetBufferedInputs(int32 ClientID, int32 MaxCount)
-{
-    TArray<FBulletPlayerInput> Result;
-    
-    FInputBuffer* Buffer = ClientInputBuffers.Find(ClientID);
-    if (Buffer)
-    {
-        Buffer->CompressAndGetInputs(Result, MaxCount);
-    }
-    
-    return Result;
-}
-
-int32 ATestActor::GetPingInFrames()
-{
-    // Estimate ping based on a default value since PlayerState->GetPingInMilliseconds() is not readily available
-    // In a real implementation, you could use a network subsystem to get actual ping values
-    
-    if (GetWorld() && GetWorld()->GetGameState())
-    {
-        APlayerController* PC = GetWorld()->GetFirstPlayerController();
-        if (PC && PC->PlayerState)
-        {
-            // Most UE projects have a GetPing() method that returns ping in ms
-            // Since we can't access it directly, we'll estimate
-            
-            // Assuming 60Hz physics and a typical ping of 100ms
-            return FMath::CeilToInt(100.0f / (FixedDeltaTime * 1000.0f));
-        }
-    }
-    
-    // Default to 5 frames (about 83ms at 60fps)
-    return 5;
+	randvar = mt->getRandSeed();
 }
 
 void ATestActor::AddImpulse(int ID, FVector Impulse, FVector Location)
@@ -616,8 +411,19 @@ void ATestActor::MC_SendStateToClients_Implementation(FBulletSimulationState ser
 // 	
 // }
 
+int ATestActor::GetPingInFrames()
+{
+	// not implemented
+	// this may not be needed since the server can
+	// communicate ping through the multicast
+	// int x = FPlatformTime::Seconds();
+	
+	return 60;
+}
 
 // END NEW METHODS
+
+// the following functions are part of the bullet plugin API and don't need to be change (i think)
 
 void ATestActor::SetupStaticGeometryPhysics(TArray<AActor*> Actors, float Friction, float Restitution)
 {
@@ -990,25 +796,5 @@ void ATestActor::GetPhysicsState(int ID, FTransform& transforms, FVector& Veloci
 		Velocity = BulletHelpers::ToUEDir(BtRigidBodies[ID]->getLinearVelocity(), false);
 		AngularVelocity = BulletHelpers::ToUEDir(BtRigidBodies[ID]->getAngularVelocity(), false);
 		Force = BulletHelpers::ToUEDir(BtRigidBodies[ID]->getTotalForce(), false);
-	}
-}
-void ATestActor::ResetSim()
-{
-	
-	for (int i = 0; i < BtRigidBodies.Num(); i++)
-	{
-		BtWorld->removeRigidBody(BtRigidBodies[i]);
-		BtRigidBodies[i]->setActivationState(ACTIVE_TAG);
-		BtRigidBodies[i]->setDeactivationTime(0);
-		BtRigidBodies[i]->clearForces();
-	}
-	
-	BtWorld = new btDiscreteDynamicsWorld(BtCollisionDispatcher, BtBroadphase, BtConstraintSolver, BtCollisionConfig);
-	BtWorld->setGravity(btVector3(0, 0, -9.8));
-	BtBroadphase->resetPool(BtCollisionDispatcher);
-	BtConstraintSolver->reset();
-	for (int i = 0; i < BtRigidBodies.Num(); i++)
-	{
-		BtWorld->addRigidBody(BtRigidBodies[i]);
 	}
 }
