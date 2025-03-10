@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Pawn.h"
+#include "BasicPhysicsPawn.generated.h"
 
 UCLASS()
 class BULLETPHYSICSENGINE_API ABasicPhysicsPawn : public APawn
