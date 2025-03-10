@@ -14,7 +14,7 @@
 #include <functional>
 #include "GameFramework/Actor.h"
 #include "Net/UnrealNetwork.h"
-#include "TestActor.generated.h"
+#include "BulletWorld.generated.h"
 
 USTRUCT(BlueprintType)
 struct Ftris
@@ -77,13 +77,13 @@ struct FBulletSimulationState
 };
 
 UCLASS()
-class BULLETPHYSICSENGINE_API ATestActor : public AActor
+class BULLETPHYSICSENGINE_API ABulletWorld : public AActor
 {
 	GENERATED_BODY()
 	
 public:	
 	// Sets default values for this actor's properties
-	ATestActor();
+	ABulletWorld();
 
 	// FIFO Buffer of inputs coming into the server
 	TMpscQueue<FBulletPlayerInput> InputBuffer;
@@ -245,9 +245,9 @@ public:
 
 	btCollisionShape* GetConvexHullCollisionShape(UBodySetup* BodySetup, int ConvexIndex, const FVector& Scale);
 
-	const ATestActor::CachedDynamicShapeData& GetCachedDynamicShapeData(AActor* Actor, float Mass);
+	const ABulletWorld::CachedDynamicShapeData& GetCachedDynamicShapeData(AActor* Actor, float Mass);
 
-	btRigidBody* AddRigidBody(AActor* Actor, const ATestActor::CachedDynamicShapeData& ShapeData, float Friction, float Restitution);
+	btRigidBody* AddRigidBody(AActor* Actor, const ABulletWorld::CachedDynamicShapeData& ShapeData, float Friction, float Restitution);
 
 	btRigidBody* AddRigidBody(AActor* Actor, btCollisionShape* CollisionShape, btVector3 Inertia, float Mass, float Friction, float Restitution);
 	UFUNCTION(BlueprintCallable)
