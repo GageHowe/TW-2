@@ -129,8 +129,6 @@ public:
 	// THESE FUNCTIONS ARE PART OF THE API AND LARGELY SHOULDN'T BE TOUCHED
 	void SetupStaticGeometryPhysics(TArray<AActor*> Actors, float Friction, float Restitution);
 	UFUNCTION(BlueprintCallable)
-	void activate();
-	UFUNCTION(BlueprintCallable)
 	void AddStaticBody(AActor* player, float Friction, float Restitution,int &ID);
 	UFUNCTION(BlueprintCallable)
 	void AddProcBody(AActor* Body,  float Friction, TArray<FVector> a, TArray<FVector> b, TArray<FVector> c, TArray<FVector> d, float Restitution, int& ID);

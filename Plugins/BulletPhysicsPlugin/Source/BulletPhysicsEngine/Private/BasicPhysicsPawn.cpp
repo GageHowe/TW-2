@@ -19,9 +19,9 @@ void ABasicPhysicsPawn::Tick(float DeltaTime)
 	
 }
 
-void ABasicPhysicsPawn::SetupPlayerInputComponent(class UInputComponent* InputComponent)
+void ABasicPhysicsPawn::SetupPlayerInputComponent(class UInputComponent* ThisInputComponent)
 {
-	Super::SetupPlayerInputComponent(InputComponent);
+	Super::SetupPlayerInputComponent(ThisInputComponent);
 	
 }
 
