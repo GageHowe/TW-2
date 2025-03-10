@@ -3,9 +3,11 @@
 ABasicPhysicsPawn::ABasicPhysicsPawn()
 {
 	PrimaryActorTick.bCanEverTick = true;
-	
+	StaticMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("PlayerMesh"));
+	RootComponent = StaticMesh;
+	Camera = CreateDefaultSubobject<UCameraComponent>(TEXT("PlayerCamera"));
+	Camera->SetupAttachment(StaticMesh);
 }
-
 
 void ABasicPhysicsPawn::BeginPlay()
 {
