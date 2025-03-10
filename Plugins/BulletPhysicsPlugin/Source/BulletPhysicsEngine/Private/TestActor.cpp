@@ -256,42 +256,6 @@ void ATestActor::MC_SendStateToClients_Implementation(FBulletSimulationState Ser
     ReconcileState(ServerState);
 }
 
-// Original function from the example code, keeping for compatibility but will be removed
-void ATestActor::MC_SendStateToClients_Implementation(FBulletSimulationState serverState, FDateTime time)
-{
-    BtCriticalSection.Lock();
-    
-    for (int i = 0; i < serverState.ObjectStates.Num(); i++)
-    {
-        // Checks
-        MapCriticalSection.Lock();
-        int32* clientIDPtr = ServerIdToClientId.Find(i);
-        MapCriticalSection.Unlock();
-        if (clientIDPtr == nullptr)
-        {
-            continue;
-        }
-        int32 clientID = *clientIDPtr;
-        if (!BtRigidBodies.IsValidIndex(clientID))
-        {
-            continue;
-        }
-
-        FDateTime clientTime = FDateTime::Now();
-        FTimespan diff = time - clientTime;
-        
-        StepPhysicsXFrames(FMath::CeilToInt((diff.GetTotalSeconds()) / FixedDeltaTime));
-
-        // Sync; TODO: add prediction
-        BtRigidBodies[clientID]->setWorldTransform(BulletHelpers::ToBt(serverState.ObjectStates[i].Transform, GetActorLocation()));
-        BtRigidBodies[clientID]->setLinearVelocity(BulletHelpers::ToBtDir(serverState.ObjectStates[i].Velocity));
-        BtRigidBodies[clientID]->setAngularVelocity(BulletHelpers::ToBtDir(serverState.ObjectStates[i].AngularVelocity));
-        // BtRigidBodies[clientID]->applyForce(); // don't worry about force for now
-    }
-
-    BtCriticalSection.Unlock();
-}
-
 void ATestActor::ReconcileState(const FBulletSimulationState& ServerState)
 {
     // Skip reconciliation if we're already reconciling
@@ -508,63 +472,27 @@ void ATestActor::GetVelocityAtLocation(int ID, FVector Location, FVector&Velocit
 }
 
 // NETWORKING
+//
+// FBulletSimulationState ATestActor::getState()
+// {
+// 	FBulletSimulationState state;
+// 	state.FrameNumber = CurrentFrameNumber;
+//
+// 	for (int i = 0; i < BtRigidBodies.Num(); i++)
+// 	{
+// 		btRigidBody* body = BtRigidBodies[i];
+// 		FBulletObjectState os;
+// 		
+// 		os.Transform = BulletHelpers::ToUE(body->getWorldTransform(), GetActorLocation());
+// 		os.Velocity = BulletHelpers::ToUEDir(body->getLinearVelocity(), false);
+// 		os.AngularVelocity = BulletHelpers::ToUEDir(body->getAngularVelocity(), false);
+// 		os.Force = BulletHelpers::ToUEDir(body->getTotalForce(), false);
+// 		
+// 		state.insert(os, i);
+// 	}
+// 	return state;
+// }
 
-FBulletSimulationState ATestActor::getState()
-{
-	FBulletSimulationState state;
-	state.FrameNumber = CurrentFrameNumber;
-
-	for (int i = 0; i < BtRigidBodies.Num(); i++)
-	{
-		btRigidBody* body = BtRigidBodies[i];
-		FBulletObjectState os;
-		
-		os.Transform = BulletHelpers::ToUE(body->getWorldTransform(), GetActorLocation());
-		os.Velocity = BulletHelpers::ToUEDir(body->getLinearVelocity(), false);
-		os.AngularVelocity = BulletHelpers::ToUEDir(body->getAngularVelocity(), false);
-		os.Force = BulletHelpers::ToUEDir(body->getTotalForce(), false);
-		
-		state.insert(os, i);
-	}
-	return state;
-}
-
-void ATestActor::MC_SendStateToClients_Implementation(FBulletSimulationState serverState, FDateTime serverTime)
-{
-	BtCriticalSection.Lock();
-	
-	for (int i = 0; i < serverState.ObjectStates.Num(); i++)
-	{
-		// Checks
-
-		MapCriticalSection.Lock();
-		int32* clientIDPtr = ServerIdToClientId.Find(i);
-		MapCriticalSection.Unlock();
-		if (clientIDPtr == nullptr)
-		{
-			continue;
-		}
-		int32 clientID = *clientIDPtr;
-		if (!BtRigidBodies.IsValidIndex(clientID))
-		{
-			continue;
-		}
-
-		FDateTime clientTime = FDateTime::Now();
-		FTimespan diff = serverTime - clientTime;
-		
-		
-		StepPhysicsXFrames((diff.GetTotalSeconds()) * FixedDeltaTime);
-
-		// Sync; TODO: add prediction
-		BtRigidBodies[clientID]->setWorldTransform(BulletHelpers::ToBt((serverState.ObjectStates[i].Transform), GetActorLocation()));
-		BtRigidBodies[clientID]->setLinearVelocity(BulletHelpers::ToBtDir(serverState.ObjectStates[i].Velocity));
-		BtRigidBodies[clientID]->setAngularVelocity(BulletHelpers::ToBtDir(serverState.ObjectStates[i].AngularVelocity));
-		// BtRigidBodies[clientID]->applyForce(); // don't worry about force for now
-	}
-
-	BtCriticalSection.Unlock();
-}
 //
 // void ATestActor::EnqueueInput(FBulletPlayerInput Input, int32 ID)
 // {

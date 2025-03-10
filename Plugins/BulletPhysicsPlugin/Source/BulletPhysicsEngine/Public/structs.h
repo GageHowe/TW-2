@@ -105,6 +105,108 @@ struct BULLETPHYSICSENGINE_API FBulletObjectState
     }
 };
 
+// Circular buffer for storing inputs
+USTRUCT(BlueprintType)
+struct BULLETPHYSICSENGINE_API FInputBuffer
+{
+    GENERATED_BODY()
+    
+    UPROPERTY()
+    TArray<FBulletPlayerInput> Buffer;
+    
+    UPROPERTY()
+    int32 Head = 0;
+    
+    UPROPERTY()
+    int32 Size = 0;
+    
+    FInputBuffer()
+    {
+        Buffer.SetNum(INPUT_BUFFER_SIZE);
+    }
+    
+    void Enqueue(const FBulletPlayerInput& Input)
+    {
+        if (Size >= INPUT_BUFFER_SIZE)
+        {
+            // Buffer full, overwrite oldest
+            Head = (Head + 1) % INPUT_BUFFER_SIZE;
+        }
+        else
+        {
+            Size++;
+        }
+        
+        int32 Index = (Head + Size - 1) % INPUT_BUFFER_SIZE;
+        Buffer[Index] = Input;
+    }
+    
+    bool Dequeue(FBulletPlayerInput& Output)
+    {
+        if (Size == 0)
+        {
+            return false;
+        }
+        
+        Output = Buffer[Head];
+        Head = (Head + 1) % INPUT_BUFFER_SIZE;
+        Size--;
+        return true;
+    }
+    
+    bool Peek(FBulletPlayerInput& Output) const
+    {
+        if (Size == 0)
+        {
+            return false;
+        }
+        
+        Output = Buffer[Head];
+        return true;
+    }
+    
+    void CompressAndGetInputs(TArray<FBulletPlayerInput>& OutInputs, int32 MaxCount)
+    {
+        OutInputs.Empty();
+        FBulletPlayerInput CurrentInput;
+        int32 StartIndex = Head;
+        
+        // Gather inputs
+        for (int32 i = 0; i < FMath::Min(Size, MaxCount); i++)
+        {
+            int32 Index = (StartIndex + i) % INPUT_BUFFER_SIZE;
+            FBulletPlayerInput& Input = Buffer[Index];
+            
+            // Initialize to first input
+            if (i == 0)
+            {
+                CurrentInput = Input;
+                CurrentInput.DuplicateCount = 1;
+                continue;
+            }
+            
+            // If same input, increment count
+            if (Input == CurrentInput && Input.FrameNumber == CurrentInput.FrameNumber + CurrentInput.DuplicateCount)
+            {
+                CurrentInput.DuplicateCount++;
+            }
+            else
+            {
+                // Different input, add current and start new
+                OutInputs.Add(CurrentInput);
+                CurrentInput = Input;
+                CurrentInput.DuplicateCount = 1;
+            }
+        }
+        
+        // Add last processed input
+        if (CurrentInput.DuplicateCount > 0)
+        {
+            OutInputs.Add(CurrentInput);
+        }
+    }
+};
+
 USTRUCT(BlueprintType) // A simulation state is an array of all object states
 struct BULLETPHYSICSENGINE_API FBulletSimulationState
 {
@@ -160,8 +262,6 @@ struct BULLETPHYSICSENGINE_API FBulletSimulationState
     }
 };
 
-
-
 // Cache of historical states for reconciliation
 USTRUCT(BlueprintType)
 struct BULLETPHYSICSENGINE_API FStateCache
@@ -188,7 +288,7 @@ struct BULLETPHYSICSENGINE_API FStateCache
     FBulletSimulationState* GetState(int32 FrameNumber)
     {
         // Check if frame is within valid range
-        if (FrameNumber < 0 || FrameNumber >= STATE_CACHE_SIZE)
+        if (FrameNumber < 0)
         {
             return nullptr;
         }

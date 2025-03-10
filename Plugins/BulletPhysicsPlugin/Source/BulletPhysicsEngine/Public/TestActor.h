@@ -221,10 +221,6 @@ public:
 	UFUNCTION(NetMulticast, Reliable, BlueprintCallable)
 	void MC_SendStateToClients(FBulletSimulationState ServerState);
 	
-	// Original function from the example code, keeping for compatibility
-	UFUNCTION(NetMulticast, Reliable, BlueprintCallable)
-	void MC_SendStateToClients(FBulletSimulationState serverState, FDateTime time);
-	
 	// Step physics for multiple frames
 	UFUNCTION(BlueprintCallable)
 	void StepPhysicsXFrames(int32 FrameCount)
