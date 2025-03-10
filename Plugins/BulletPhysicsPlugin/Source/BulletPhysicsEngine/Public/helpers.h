@@ -18,6 +18,16 @@
 #include "helpers.generated.h"
 
 USTRUCT(BlueprintType)
+struct Ftris
+{
+	GENERATED_BODY()
+	FVector a;
+	FVector b;
+	FVector c;
+	FVector d;
+};
+
+USTRUCT(BlueprintType)
 struct FBulletPlayerInput
 {
 	GENERATED_BODY()

@@ -20,16 +20,6 @@
 #include "helpers.h"
 #include "TestActor.generated.h"
 
-USTRUCT(BlueprintType)
-struct Ftris
-{
-	GENERATED_BODY()
-	FVector a;
-	FVector b;
-	FVector c;
-	FVector d;
-};
-
 UCLASS()
 class BULLETPHYSICSENGINE_API ATestActor : public AActor
 {
@@ -37,33 +27,6 @@ class BULLETPHYSICSENGINE_API ATestActor : public AActor
 	
 public:	
 	ATestActor();
-
-	AActor* GetActorFromNetGUID(FNetworkGUID guid)
-	{
-		UNetDriver* driver = GetWorld()->GetNetDriver();
-		FNetGUIDCache* cache = driver->GuidCache.Get();
-		if (driver && cache) {
-			UObject *obj = cache->GetObjectFromNetGUID(guid, false);
-			AActor* actor = Cast<AActor>(obj);
-		} else
-		{
-			if(GEngine) GEngine->AddOnScreenDebugMessage(-1, 15.0f, FColor::Red, TEXT("GetActorFromNetGUID returned null"));
-			return nullptr;
-		}
-	}
-
-	FNetworkGUID GetNetGUIDFromActor(AActor* actor) const
-	{
-		if (actor && GetWorld()->GetNetDriver())
-		{
-			FNetworkGUID NetGUID = GetWorld()->GetNetDriver()->GuidCache->GetOrAssignNetGUID(actor);
-			return NetGUID;
-		} else
-		{
-			if(GEngine) GEngine->AddOnScreenDebugMessage(-1, 15.0f, FColor::Red, TEXT("GetNetGUIDFromActor returned zeroed"));
-			return FNetworkGUID(); // objectID 0
-		}
-	}
 
 	// current simulation state
 	// server sends this to client who sets their state to it and extrapolates from there
@@ -136,6 +99,34 @@ protected:
 	virtual void BeginPlay() override;
 public:	
 	virtual void Tick(float DeltaTime) override;
+
+	// THE FOLLOWING FUNCTIONS ARE FOR SYNCING ACTORS WITH UNIQUE IDs. FNetworkGUID is a unique, replicated ID for UObjects.
+	AActor* GetActorFromNetGUID(FNetworkGUID guid)
+	{
+		UNetDriver* driver = GetWorld()->GetNetDriver();
+		FNetGUIDCache* cache = driver->GuidCache.Get();
+		if (driver && cache)
+		{
+			UObject *obj = cache->GetObjectFromNetGUID(guid, false);
+			AActor* actor = Cast<AActor>(obj);
+		}
+		if(GEngine) GEngine->AddOnScreenDebugMessage(-1, 15.0f, FColor::Red, TEXT("GetActorFromNetGUID returned null"));
+		return nullptr;
+	}
+	FNetworkGUID GetNetGUIDFromActor(AActor* actor) const
+	{
+		if (actor && GetWorld()->GetNetDriver())
+		{
+			FNetworkGUID NetGUID = GetWorld()->GetNetDriver()->GuidCache->GetOrAssignNetGUID(actor);
+			return NetGUID;
+		} else
+		{
+			if(GEngine) GEngine->AddOnScreenDebugMessage(-1, 15.0f, FColor::Red, TEXT("GetNetGUIDFromActor returned zeroed"));
+			return FNetworkGUID(); // objectID 0
+		}
+	}
+
+	// THESE FUNCTIONS ARE PART OF THE API AND LARGELY SHOULDN'T BE TOUCHED
 	void SetupStaticGeometryPhysics(TArray<AActor*> Actors, float Friction, float Restitution);
 	UFUNCTION(BlueprintCallable)
 	void activate();
@@ -184,7 +175,4 @@ public:
 	void GetVelocityAtLocation(int ID, FVector Location, FVector& Velocity);
 	UFUNCTION(BlueprintCallable)
 	void ResetSim();
-
-	// networking code goes below
-	
 };
