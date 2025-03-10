@@ -17,8 +17,8 @@
 #include "Engine/PackageMapClient.h"
 #include "GameFramework/Actor.h"
 #include "Net/UnrealNetwork.h"
+#include "helpers.h"
 #include "TestActor.generated.h"
-
 
 USTRUCT(BlueprintType)
 struct Ftris
@@ -30,55 +30,6 @@ struct Ftris
 	FVector d;
 };
 
-USTRUCT(BlueprintType)
-struct FBulletPlayerInput
-{
-	GENERATED_BODY()
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Physics Networking")
-		FVector MovementInput; // 0-1 on all axes, in local space (x,y,z)
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Physics Networking")
-		bool BoostInput; // 0-1
-
-	UPROPERTY(BlueprintReadWrite, Category = "Physics Networking")
-    	int32 FrameNumber; // Frame number for this input; is this necessary?
-};
-
-USTRUCT(BlueprintType) // A FBulletObjectState is the instantaneous state of one object in a frame
-struct FBulletObjectState
-{
-	GENERATED_BODY()
-	
-	UPROPERTY(BlueprintReadWrite, Category = "Physics Networking")
-	int32 ObjectID; // is this really necessary?
-
-	UPROPERTY(BlueprintReadWrite, Category = "Physics Networking")
-	FTransform Transform;
-
-	UPROPERTY(BlueprintReadWrite, Category = "Physics Networking")
-	FVector Velocity;
-
-	UPROPERTY(BlueprintReadWrite, Category = "Physics Networking")
-	FVector AngularVelocity;
-
-	UPROPERTY(BlueprintReadWrite, Category = "Physics Networking")
-	int32 FrameNumber;
-};
-
-USTRUCT(BlueprintType) // A FBulletSimulationState is an array of all object states
-struct FBulletSimulationState
-{
-	GENERATED_BODY()
-	TArray<FBulletObjectState> ObjectStates;
-	int32 FrameNumber;
-
-	void insert(FBulletObjectState obj, int num)
-	{
-		ObjectStates.Add(obj);
-	}
-};
-
 UCLASS()
 class BULLETPHYSICSENGINE_API ATestActor : public AActor
 {
@@ -87,13 +38,17 @@ class BULLETPHYSICSENGINE_API ATestActor : public AActor
 public:	
 	ATestActor();
 
-	UObject* GetObjectFromNetGUID(FNetworkGUID guid)
+	AActor* GetActorFromNetGUID(FNetworkGUID guid)
 	{
 		UNetDriver* driver = GetWorld()->GetNetDriver();
 		FNetGUIDCache* cache = driver->GuidCache.Get();
 		if (driver && cache) {
 			UObject *obj = cache->GetObjectFromNetGUID(guid, false);
-			return obj;
+			AActor* actor = Cast<AActor>(obj);
+		} else
+		{
+			if(GEngine) GEngine->AddOnScreenDebugMessage(-1, 15.0f, FColor::Red, TEXT("GetActorFromNetGUID returned null"));
+			return nullptr;
 		}
 	}
 
@@ -105,6 +60,7 @@ public:
 			return NetGUID;
 		} else
 		{
+			if(GEngine) GEngine->AddOnScreenDebugMessage(-1, 15.0f, FColor::Red, TEXT("GetNetGUIDFromActor returned zeroed"));
 			return FNetworkGUID(); // objectID 0
 		}
 	}
