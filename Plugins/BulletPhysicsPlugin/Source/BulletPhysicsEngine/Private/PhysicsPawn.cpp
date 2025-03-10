@@ -21,23 +21,41 @@ APhysicsPawn::APhysicsPawn()
 	bRightClickPressed = false;
 }
 
-// Called when the game starts or when spawned
 void APhysicsPawn::BeginPlay()
 {
 	Super::BeginPlay();
-	
+    
 	// Find physics actor if not set
 	if (!PhysicsActor)
 	{
 		PhysicsActor = FindPhysicsActor();
+        
+		if (PhysicsActor)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("Found PhysicsActor"));
+		}
+		else
+		{
+			UE_LOG(LogTemp, Error, TEXT("Failed to find PhysicsActor!"));
+		}
 	}
-	
-	// If we're the locally controlled pawn, initialize the rigid body
-	if (IsLocallyControlled() || HasAuthority())
+    
+	// All clients and the server should initialize physics
+	if (PhysicsActor)
 	{
-		InitializeRigidBody();
+		FTimerHandle TimerHandle;
+		GetWorldTimerManager().SetTimer(TimerHandle, [this]() {
+			// Initialize physics after a slight delay
+			if (PhysicsBodyID < 0)
+			{
+				UE_LOG(LogTemp, Warning, TEXT("PhysicsPawn %s initializing rigid body (Client=%d)"), 
+					*GetName(), IsLocallyControlled());
+				InitializeRigidBody();
+			}
+		}, 1.0f, false);
 	}
 }
+
 
 // Called every frame
 void APhysicsPawn::Tick(float DeltaTime)
@@ -90,53 +108,83 @@ ATestActor* APhysicsPawn::FindPhysicsActor()
 	return nullptr;
 }
 
+
 void APhysicsPawn::InitializeRigidBody()
 {
 	if (!PhysicsActor)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("PhysicsPawn::InitializeRigidBody: No PhysicsActor found!"));
+		UE_LOG(LogTemp, Error, TEXT("InitializeRigidBody: No PhysicsActor found!"));
 		return;
 	}
-	
+    
 	if (PhysicsBodyID >= 0)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("PhysicsPawn::InitializeRigidBody: Already initialized!"));
+		UE_LOG(LogTemp, Warning, TEXT("InitializeRigidBody: Already initialized with ID %d"), PhysicsBodyID);
 		return;
 	}
-	
+    
+	// Client needs to use the ID from the server
+	if (!HasAuthority() && !IsLocallyControlled())
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Waiting for server to initialize physics body..."));
+		return;
+	}
+    
+	UE_LOG(LogTemp, Warning, TEXT("Adding rigid body for %s (Auth=%d, Local=%d)"), 
+		*GetName(), HasAuthority() ? 1 : 0, IsLocallyControlled() ? 1 : 0);
+    
 	// Add rigid body to physics simulation
-	float Mass = 100.0f; // kg
+	float Mass = 100.0f;
 	float Friction = 0.3f;
 	float Restitution = 0.1f;
-	
+    
+	// Protected by lock in AddRigidBody
 	PhysicsActor->AddRigidBody(this, Friction, Restitution, PhysicsBodyID, Mass);
-	
-	// Set client ID same as body ID for simplicity in this example
+    
+	// Set client ID same as body ID
 	ClientID = PhysicsBodyID;
-	
-	// If we're on the client, map our local ID to server ID
+    
+	// Map client ID to server ID if needed (local client only)
 	if (!HasAuthority() && IsLocallyControlled())
 	{
+		// Add mapping for this client
 		PhysicsActor->MapCriticalSection.Lock();
-		PhysicsActor->ClientIdToServerId.Add(ClientID, PhysicsBodyID);
+		PhysicsActor->ClientIdToServerId.Add(ClientID, ClientID); // Map to self initially
 		PhysicsActor->MapCriticalSection.Unlock();
+        
+		UE_LOG(LogTemp, Warning, TEXT("Added ID mapping: %d -> %d"), ClientID, ClientID);
 	}
-	
-	UE_LOG(LogTemp, Warning, TEXT("PhysicsPawn::InitializeRigidBody: Created body ID %d"), PhysicsBodyID);
+    
+	UE_LOG(LogTemp, Warning, TEXT("Created physics body with ID %d"), PhysicsBodyID);
 }
 
 void APhysicsPawn::UpdateFromPhysics()
 {
-	if (PhysicsActor && PhysicsBodyID >= 0)
+	if (!PhysicsActor)
 	{
-		FTransform NewTransform;
-		FVector Velocity, AngularVelocity, Force;
-		
-		PhysicsActor->GetPhysicsState(PhysicsBodyID, NewTransform, Velocity, AngularVelocity, Force);
-		
-		// Update actor transform from physics
-		SetActorTransform(NewTransform);
+		return;
 	}
+    
+	if (PhysicsBodyID < 0)
+	{
+		return;
+	}
+    
+	// Safety check to make sure PhysicsBodyID is valid
+	if (!PhysicsActor->BtRigidBodies.IsValidIndex(PhysicsBodyID))
+	{
+		UE_LOG(LogTemp, Error, TEXT("Invalid PhysicsBodyID: %d (BtRigidBodies size: %d)"), 
+			PhysicsBodyID, PhysicsActor->BtRigidBodies.Num());
+		return;
+	}
+    
+	FTransform NewTransform;
+	FVector Velocity, AngularVelocity, Force;
+    
+	PhysicsActor->GetPhysicsState(PhysicsBodyID, NewTransform, Velocity, AngularVelocity, Force);
+    
+	// Update actor transform from physics
+	SetActorTransform(NewTransform);
 }
 
 void APhysicsPawn::MoveForward(float Value)
@@ -247,17 +295,30 @@ void APhysicsPawn::ProcessInput()
 	Server_SendInput(InputCache);
 }
 
+// Add this to PhysicsPawn.cpp - improved Server_SendInput_Implementation
 void APhysicsPawn::Server_SendInput_Implementation(const TArray<FBulletPlayerInput>& Inputs)
 {
 	if (!PhysicsActor)
 	{
+		UE_LOG(LogTemp, Warning, TEXT("Server_SendInput: No PhysicsActor found"));
 		return;
 	}
-	
-	// Process inputs on server
+    
+	// Log for debugging
+	UE_LOG(LogTemp, Warning, TEXT("SERVER: Received %d inputs from client %d"), Inputs.Num(), ClientID);
+    
+	// Process all inputs from client
 	for (const FBulletPlayerInput& Input : Inputs)
 	{
-		PhysicsActor->EnqueueInput(Input, ClientID);
+		// Create a modified input with the correct client ID
+		FBulletPlayerInput ModifiedInput = Input;
+		ModifiedInput.ObjectID = ClientID; // Use the server's ID for this client
+        
+		// Add to server's input buffer
+		PhysicsActor->EnqueueInput(ModifiedInput, ClientID);
+        
+		// Apply input directly for immediate response
+		PhysicsActor->ProcessClientInput(ModifiedInput);
 	}
 }
 
