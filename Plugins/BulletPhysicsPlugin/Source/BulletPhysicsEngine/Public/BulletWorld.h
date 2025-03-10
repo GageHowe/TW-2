@@ -27,6 +27,8 @@ struct Ftris
 
 };
 
+
+
 USTRUCT(BlueprintType)
 struct FBulletPlayerInput
 {
