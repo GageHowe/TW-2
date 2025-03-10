@@ -1,8 +1,6 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #include "TestActor.h"
-
-#include "SimpleBallPawn.h"
 #include "Types/AttributeStorage.h"
 #include "Net/UnrealNetwork.h"
 #include "Engine/World.h"
@@ -193,71 +191,48 @@ void ATestActor::ProcessClientInput(const FBulletPlayerInput& Input)
 
 void ATestActor::ApplyInput(const FBulletPlayerInput& Input)
 {
-	// Check if the object ID is valid
-	if (!BtRigidBodies.IsValidIndex(Input.ObjectID) || !BtRigidBodies[Input.ObjectID])
-	{
-		UE_LOG(LogTemp, Warning, TEXT("ApplyInput: Invalid object ID %d (BtRigidBodies size: %d)"), 
-			Input.ObjectID, BtRigidBodies.Num());
-		return;
-	}
+    // Check if the object ID is valid
+    if (!BtRigidBodies.IsValidIndex(Input.ObjectID) || !BtRigidBodies[Input.ObjectID])
+    {
+        return;
+    }
     
-	btRigidBody* Body = BtRigidBodies[Input.ObjectID];
-	AActor* ControlledActor = static_cast<AActor*>(Body->getUserPointer());
+    btRigidBody* Body = BtRigidBodies[Input.ObjectID];
     
-	// Handle ball-specific input
-	ASimpleBallPawn* Ball = Cast<ASimpleBallPawn>(ControlledActor);
-	if (Ball)
-	{
-		// Apply movement with appropriate force
-		if (!Input.MovementInput.IsNearlyZero())
-		{
-			FVector WorldForce = Input.MovementInput * Ball->RollForce;
-			Body->applyCentralForce(BulletHelpers::ToBtDir(WorldForce, false));
-		}
+    // Apply movement input
+    if (!Input.MovementInput.IsNearlyZero())
+    {
+        // Convert local input to world space
+        FTransform BodyTransform = BulletHelpers::ToUE(Body->getWorldTransform(), GetActorLocation());
+        FVector WorldForce = BodyTransform.TransformVector(Input.MovementInput * 1000.0f); // Scale force
         
-		// Apply jump
-		if (Input.Ability && Ball->bIsOnGround)
-		{
-			Body->applyCentralImpulse(btVector3(0, 0, Ball->JumpForce));
-		}
-	}
-	else
-	{
-		// Default handling for other pawn types
-		if (!Input.MovementInput.IsNearlyZero())
-		{
-			// Convert local input to world space
-			FTransform BodyTransform = BulletHelpers::ToUE(Body->getWorldTransform(), GetActorLocation());
-			FVector WorldForce = BodyTransform.TransformVector(Input.MovementInput * 1000.0f);
-            
-			Body->applyCentralForce(BulletHelpers::ToBtDir(WorldForce, false));
-		}
-        
-		// Apply ability input
-		if (Input.Ability)
-		{
-			Body->applyCentralImpulse(btVector3(0, 0, 500.0f));
-		}
-	}
+        Body->applyCentralForce(BulletHelpers::ToBtDir(WorldForce, false));
+    }
     
-	// If actor implements the controllable interface, pass input to it
-	if (ControlledActor && ControlledActor->GetClass()->ImplementsInterface(UControllableInterface::StaticClass()))
-	{
-		IControllableInterface::Execute_OnPlayerInput(ControlledActor, Input);
-	}
+    // Apply ability input
+    if (Input.Ability)
+    {
+        // Add a jump impulse
+        Body->applyCentralImpulse(btVector3(0, 0, 500.0f));
+    }
+    
+    // Get the actor this body represents
+    AActor* ControlledActor = static_cast<AActor*>(Body->getUserPointer());
+    
+    // If actor implements the controllable interface, pass input to it
+    if (ControlledActor && ControlledActor->GetClass()->ImplementsInterface(UControllableInterface::StaticClass()))
+    {
+        IControllableInterface::Execute_OnPlayerInput(ControlledActor, Input);
+    }
 }
 
 void ATestActor::EnqueueInput(const FBulletPlayerInput& Input, int32 ClientID)
 {
-	// Get or create input buffer for this client
-	FInputBuffer& Buffer = ClientInputBuffers.FindOrAdd(ClientID);
+    // Get or create input buffer for this client
+    FInputBuffer& Buffer = ClientInputBuffers.FindOrAdd(ClientID);
     
-	// Log what we're enqueueing
-	UE_LOG(LogTemp, Warning, TEXT("SERVER: Enqueueing input for client %d: movement=(%f,%f), frame=%d"), 
-		  ClientID, Input.MovementInput.X, Input.MovementInput.Y, Input.FrameNumber);
-    
-	// Add input to buffer
-	Buffer.Enqueue(Input);
+    // Add input to buffer
+    Buffer.Enqueue(Input);
 }
 
 void ATestActor::Server_SendInput_Implementation(const TArray<FBulletPlayerInput>& Inputs)
@@ -930,36 +905,21 @@ void ATestActor::SetPhysicsState(int ID, FTransform transforms, FVector Velocity
 		//BtRigidBodies[ID]->apply(BulletHelpers::ToBtPos(Velocity, GetActorLocation()));
 	}
 }
-
 void ATestActor::GetPhysicsState(int ID, FTransform& transforms, FVector& Velocity, FVector& AngularVelocity, FVector& Force)
 {
-	// Safety check for valid ID
-	if (!BtRigidBodies.IsValidIndex(ID) || !BtRigidBodies[ID])
-	{
-		// Set default values instead of crashing
-		transforms = FTransform::Identity;
-		Velocity = FVector::ZeroVector;
-		AngularVelocity = FVector::ZeroVector;
-		Force = FVector::ZeroVector;
-        
-		UE_LOG(LogTemp, Warning, TEXT("GetPhysicsState: Invalid ID %d (BtRigidBodies size: %d)"), 
-			ID, BtRigidBodies.Num());
-		return;
+	if (BtRigidBodies[ID]) {
+		// Debug output
+		UE_LOG(LogTemp, Warning, TEXT("Raw Bullet Velocity: %f,%f,%f"), 
+			BtRigidBodies[ID]->getLinearVelocity().x(),
+			BtRigidBodies[ID]->getLinearVelocity().y(),
+			BtRigidBodies[ID]->getLinearVelocity().z());
+
+		transforms = BulletHelpers::ToUE(BtRigidBodies[ID]->getWorldTransform(), GetActorLocation());
+		Velocity = BulletHelpers::ToUEDir(BtRigidBodies[ID]->getLinearVelocity(), false);
+		AngularVelocity = BulletHelpers::ToUEDir(BtRigidBodies[ID]->getAngularVelocity(), false);
+		Force = BulletHelpers::ToUEDir(BtRigidBodies[ID]->getTotalForce(), false);
 	}
-    
-	// Debug output
-	UE_LOG(LogTemp, Verbose, TEXT("Raw Bullet Velocity: %f,%f,%f"), 
-		BtRigidBodies[ID]->getLinearVelocity().x(),
-		BtRigidBodies[ID]->getLinearVelocity().y(),
-		BtRigidBodies[ID]->getLinearVelocity().z());
-
-	transforms = BulletHelpers::ToUE(BtRigidBodies[ID]->getWorldTransform(), GetActorLocation());
-	Velocity = BulletHelpers::ToUEDir(BtRigidBodies[ID]->getLinearVelocity(), false);
-	AngularVelocity = BulletHelpers::ToUEDir(BtRigidBodies[ID]->getAngularVelocity(), false);
-	Force = BulletHelpers::ToUEDir(BtRigidBodies[ID]->getTotalForce(), false);
 }
-
-
 void ATestActor::ResetSim()
 {
 	

@@ -1,11 +1,13 @@
 ﻿#include "PhysicsGameMode.h"
-#include "SimpleBallPawn.h"
+#include "PhysicsPawn.h"
 #include "Kismet/GameplayStatics.h"
+#include "Engine/World.h"
+#include "GameFramework/PlayerStart.h"
 
 APhysicsGameMode::APhysicsGameMode()
 {
-    // Set default pawn class to our ball
-    DefaultPawnClass = ASimpleBallPawn::StaticClass();
+    // Set default pawn class
+    DefaultPawnClass = APhysicsPawn::StaticClass();
 }
 
 void APhysicsGameMode::BeginPlay()
@@ -15,13 +17,7 @@ void APhysicsGameMode::BeginPlay()
     // Get or create physics actor
     PhysicsActor = GetPhysicsActor();
     
-    // Setup gravity for a rolling ball game
-    if (PhysicsActor && PhysicsActor->BtWorld)
-    {
-        PhysicsActor->BtWorld->setGravity(btVector3(0, 0, -980.0f));
-    }
-    
-    // Setup level physics
+    // Setup level physics objects
     SetupLevelPhysics();
 }
 
@@ -29,43 +25,23 @@ void APhysicsGameMode::PostLogin(APlayerController* NewPlayer)
 {
     Super::PostLogin(NewPlayer);
     
-    // Wait a bit to ensure pawn is spawned and replicated
-    FTimerHandle TimerHandle;
-    GetWorldTimerManager().SetTimer(TimerHandle, [this, NewPlayer]() {
-        APhysicsPawn* PlayerPawn = Cast<APhysicsPawn>(NewPlayer->GetPawn());
-        if (PlayerPawn && PhysicsActor)
+    // Ensure the physics actor is set on the player's pawn
+    APhysicsPawn* PlayerPawn = Cast<APhysicsPawn>(NewPlayer->GetPawn());
+    if (PlayerPawn && PhysicsActor)
+    {
+        PlayerPawn->PhysicsActor = PhysicsActor;
+        
+        // Initialize physics for new player
+        if (PlayerPawn->PhysicsBodyID < 0)
         {
-            UE_LOG(LogTemp, Warning, TEXT("Initializing physics for player %s"), 
-                  *NewPlayer->GetName());
-            
-            // Set the physics actor reference
-            PlayerPawn->PhysicsActor = PhysicsActor;
-            
-            // Server initializes rigid bodies for all players
-            if (NewPlayer->HasAuthority() && PlayerPawn->PhysicsBodyID < 0)
-            {
-                // Init and get ID
-                PlayerPawn->InitializeRigidBody();
-                
-                UE_LOG(LogTemp, Warning, TEXT("Server initialized physics body ID %d for player %s"), 
-                      PlayerPawn->PhysicsBodyID, *NewPlayer->GetName());
-                
-                // Setup ID mapping
-                PhysicsActor->MapCriticalSection.Lock();
-                PhysicsActor->ServerIdToClientId.Add(PlayerPawn->PhysicsBodyID, PlayerPawn->PhysicsBodyID);
-                PhysicsActor->MapCriticalSection.Unlock();
-            }
+            PlayerPawn->InitializeRigidBody();
         }
-        else
-        {
-            UE_LOG(LogTemp, Warning, TEXT("PostLogin: PlayerPawn or PhysicsActor is null"));
-        }
-    }, 1.5f, false);
+    }
 }
 
 ATestActor* APhysicsGameMode::GetPhysicsActor()
 {
-    // Find existing physics actor
+    // Try to find existing physics actor
     TArray<AActor*> FoundActors;
     UGameplayStatics::GetAllActorsOfClass(GetWorld(), ATestActor::StaticClass(), FoundActors);
     
@@ -74,33 +50,45 @@ ATestActor* APhysicsGameMode::GetPhysicsActor()
         return Cast<ATestActor>(FoundActors[0]);
     }
     
-    // Create new one if needed
+    // Create a new physics actor if none exists
     FActorSpawnParameters SpawnParams;
     SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
     
-    return GetWorld()->SpawnActor<ATestActor>(ATestActor::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator, SpawnParams);
+    ATestActor* NewPhysicsActor = GetWorld()->SpawnActor<ATestActor>(ATestActor::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator, SpawnParams);
+    
+    if (NewPhysicsActor)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("Created new physics actor"));
+    }
+    
+    return NewPhysicsActor;
 }
 
 void APhysicsGameMode::SetupLevelPhysics()
 {
     if (!PhysicsActor)
     {
+        UE_LOG(LogTemp, Error, TEXT("No physics actor available to setup level physics!"));
         return;
     }
     
-    // Add static geometry from level
+    // Add static geometry from the level
     TArray<AActor*> StaticActors;
     UGameplayStatics::GetAllActorsWithTag(GetWorld(), FName("StaticPhysics"), StaticActors);
     
     if (StaticActors.Num() > 0)
     {
         PhysicsActor->SetupStaticGeometryPhysics(StaticActors, 0.8f, 0.3f);
+        UE_LOG(LogTemp, Log, TEXT("Added %d static physics objects"), StaticActors.Num());
     }
     
-    // Add default ground plane if needed
-    if (StaticActors.Num() == 0)
-    {
-        btStaticPlaneShape* GroundShape = new btStaticPlaneShape(btVector3(0, 0, 1), 0);
-        PhysicsActor->AddStaticCollision(GroundShape, FTransform::Identity, 0.8f, 0.3f, nullptr);
-    }
+    // Add the floor as a static plane if needed
+    // This is an example of how to create a static ground plane
+    /*
+    btStaticPlaneShape* GroundShape = new btStaticPlaneShape(btVector3(0, 0, 1), 0); // Facing up, at z=0
+    btTransform GroundTransform;
+    GroundTransform.setIdentity();
+    
+    PhysicsActor->AddStaticCollision(GroundShape, FTransform::Identity, 0.8f, 0.1f, nullptr);
+    */
 }
