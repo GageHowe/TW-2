@@ -12,7 +12,7 @@
 #include "ThirdParty/BulletPhysicsEngineLibrary/debug/btdebug.h"
 #include "Components/ShapeComponent.h"
 #include <functional>
-
+#include <queue>
 #include "BlueprintEditor.h"
 #include "Engine/PackageMapClient.h"
 #include "GameFramework/Actor.h"
@@ -28,16 +28,19 @@ class BULLETPHYSICSENGINE_API ATestActor : public AActor
 public:	
 	ATestActor();
 
-	// current simulation state
-	// server sends this to client who sets their state to it and extrapolates from there
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Physics Networking")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FBulletSimulationState CurrentState;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Physics Networking")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 CurrentFrameNumber = 0;	// Global current frame number
 	const float FixedDeltaTime = 1.0f / 60.0f;
+
+	TMpscQueue<FBulletPlayerInput> PlayerInputQueue; // for server use
+
 	
-	// Bullet section
+
+
+	
 	// Global objects
 	btCollisionConfiguration* BtCollisionConfig;
 	btCollisionDispatcher* BtCollisionDispatcher;
@@ -59,7 +62,6 @@ public:
 	TArray<btSphereShape*> BtSphereCollisionShapes;
 	TArray<btCapsuleShape*> BtCapsuleCollisionShapes;
 	btSequentialImpulseConstraintSolver* mt;
-	// Structure to hold re-usable ConvexHull shapes based on origin BodySetup / subindex / scale
 	struct ConvexHullShapeHolder
 	{
 		UBodySetup* BodySetup;
@@ -68,32 +70,30 @@ public:
 		btConvexHullShape* Shape;
 	};
 	TArray<ConvexHullShapeHolder> BtConvexHullCollisionShapes;
-	// These shapes are for *potentially* compound rigid body shapes
 	struct CachedDynamicShapeData
 	{
-		FName ClassName; // class name for cache
+		FName ClassName;
 		btCollisionShape* Shape;
-		bool bIsCompound; // if true, this is a compound shape and so must be deleted
+		bool bIsCompound;
 		btScalar Mass;
-		btVector3 Inertia; // because we like to precalc this
+		btVector3 Inertia;
 	};
 	TArray<CachedDynamicShapeData> CachedDynamicShapes;
 
 	// This list can be edited in the level, linking to placed static actors
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Bullet Physics|Objects")
-		TArray<AActor*> PhysicsStaticActors1;
+	TArray<AActor*> PhysicsStaticActors1;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Bullet Physics|Objects")
-		TArray<AActor*> DynamicActors;
+	TArray<AActor*> DynamicActors;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Bullet Physics|Objects")
-		FString text="ra";
+	FString text="ra";
 	// These properties can only be edited in the Blueprint
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Bullet Physics|Objects")
-		float PhysicsStatic1Friction = 0.6;
+	float PhysicsStatic1Friction = 0.6;
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Bullet Physics|Objects")
-		float PhysicsStatic1Restitution = 0.3;
+	float PhysicsStatic1Restitution = 0.3;
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Bullet Physics|Objects")
-		float randvar;
-	// I chose not to use spinning / rolling friction in the end since it had issues!
+	float randvar;
 
 protected:
 	virtual void BeginPlay() override;

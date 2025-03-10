@@ -127,7 +127,7 @@ void ATestActor::AddImpulse( int ID, FVector Impulse, FVector Location)
 	BtRigidBodies[ID]->applyImpulse(BulletHelpers::ToBtDir(Impulse, true), BulletHelpers::ToBtPos(Location, GetActorLocation()));
 }
 
-// BEGIN NEW METHODS ####################################################
+// these use IDs instead of references and shouldn't be used
 
 void ATestActor::AddForce(int ID, FVector Force, FVector Location)
 {
@@ -155,16 +155,6 @@ void ATestActor::GetVelocityAtLocation(int ID, FVector Location, FVector&Velocit
 		Velocity = BulletHelpers::ToUEPos(BtRigidBodies[ID]->getVelocityInLocalPoint(BulletHelpers::ToBtPos(Location, GetActorLocation())), FVector(0));
 	}
 }
-
-// this will set the activation state to ACTIVE_TAG, so only use it on objects with that tag already
-void ATestActor::activate() {
-	if (procbody)
-		procbody->activate(true);
-}
-
-// Networking code
-
-// END NEW METHODS
 
 void ATestActor::ExtractPhysicsGeometry(AActor* Actor, PhysicsGeometryCallback CB)
 {
