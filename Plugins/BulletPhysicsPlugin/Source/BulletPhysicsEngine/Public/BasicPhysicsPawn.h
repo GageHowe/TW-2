@@ -6,6 +6,7 @@
 #include "GameFramework/Pawn.h"
 #include "helpers.h"
 #include "bthelper.h"
+#include "Net/UnrealNetwork.h"
 #include "BasicPhysicsPawn.generated.h"
 
 UCLASS()
@@ -17,6 +18,7 @@ public:
 	virtual void Tick(float DeltaTime) override;
 	virtual void SetupPlayerInputComponent(class UInputComponent* InputComponent) override;
 	virtual void BeginPlay() override;
+	virtual void GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const override;
 	virtual void PossessedBy(AController* NewController) override;
 	virtual void UnPossessed() override;
 	
@@ -37,8 +39,12 @@ public:
 	bool IsPossessed = true; // fix this to only be true when possessed
 
 	void ApplyInputs(const FBulletPlayerInput& input) const;
-	void DebugMesssage();
+	void EnableDebug();
 
+	UFUNCTION(Server, Reliable)
+	void SR_PrintID();
+
+	UPROPERTY(Replicated)
 	bool testdebug = false;
 private:
 	UPROPERTY(EditDefaultsOnly)
