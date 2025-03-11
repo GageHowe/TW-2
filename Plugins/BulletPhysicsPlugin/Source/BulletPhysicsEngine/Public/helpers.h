@@ -22,17 +22,17 @@ struct FBulletPlayerInput
 	GENERATED_BODY()
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Physics Networking")
-	FVector MovementInput; // 0-1 on all axes, in local space (x,y,z)
+	FVector MovementInput = {0,0,0}; // 0-1 on all axes, in local space (x,y,z)
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Physics Networking")
-	bool BoostInput; // 0-1
+	bool BoostInput = false; // 0-1
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Physics Networking")
-	int64 ObjectID; // get this from FNetworkGUID.ObjectID
+	int64 ObjectID = 0; // get this from FNetworkGUID.ObjectID
 	// is this even needed?
 
 	UPROPERTY(BlueprintReadWrite, Category = "Physics Networking")
-	int32 FrameNumber; // Frame number for this input; is this necessary?
+	int32 FrameNumber = 0; // Frame number for this input; is this necessary?
 };
 
 USTRUCT(BlueprintType)

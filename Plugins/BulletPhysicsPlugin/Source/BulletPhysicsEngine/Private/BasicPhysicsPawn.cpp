@@ -11,6 +11,7 @@ ABasicPhysicsPawn::ABasicPhysicsPawn()
 	Camera = CreateDefaultSubobject<UCameraComponent>(TEXT("PlayerCamera"));
 	Camera->SetupAttachment(StaticMesh);
 	SpawnCollisionHandlingMethod = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
+	SetReplicatingMovement(false);
 }
 
 void ABasicPhysicsPawn::BeginPlay()
@@ -23,7 +24,7 @@ void ABasicPhysicsPawn::BeginPlay()
 										// if you ain't crashed, the reference is valid
 	btRigidBody* rb = world->AddRigidBodyAndReturn(this, 0.2, 0.2, 1);
 	if (!rb) { GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Red, TEXT("WARNING RigidBody ptr is null")); }
-	
+	MyRigidBody = rb;
 }
 
 void ABasicPhysicsPawn::Tick(float DeltaTime)
@@ -35,8 +36,14 @@ void ABasicPhysicsPawn::Tick(float DeltaTime)
 	{
 		FBulletPlayerInput input = FBulletPlayerInput();
 		input.MovementInput = DirectionalInput;
+		
 		ApplyInputs(input);
+		
 		// LocalInputBuffer.PlayerInputs[...
+	} else if (HasAuthority())
+	{
+		// BulletWorld->SendInputsToServer
+		// printf("slkdf");
 	}
 	
 	// send inputs to server
@@ -46,10 +53,11 @@ void ABasicPhysicsPawn::Tick(float DeltaTime)
 // right now, this just accelerates the pawn, but that's fine for now
 void ABasicPhysicsPawn::ApplyInputs(const FBulletPlayerInput& input) const
 {
-	btVector3 forceVector = BulletHelpers::ToBtDir(input.MovementInput, true);
+	GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Green, TEXT("Applying inputs"));
+	btVector3 forceVector = BulletHelpers::ToBtDir(input.MovementInput, true) * 10000.0f;
+	if (!MyRigidBody) { GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Red, TEXT("WARNING RigidBody ptr is null 2")); return; }
 	MyRigidBody->applyForce(forceVector, btVector3(0, 0, 0));
 }
-
 
 void ABasicPhysicsPawn::PossessedBy(AController* NewController)
 {
