@@ -4,6 +4,8 @@
 #include "TestActor.h"
 #include "Camera/CameraComponent.h"
 #include "GameFramework/Pawn.h"
+#include "helpers.h"
+#include "bthelper.h"
 #include "BasicPhysicsPawn.generated.h"
 
 UCLASS()
@@ -21,11 +23,20 @@ public:
 	FVector DirectionalInput = FVector(0, 0, 0);
 	bool PrimaryInput = false;
 	bool SecondaryInput = false;
+
+	btRigidBody* MyRigidBody = nullptr;
+	
+	UPROPERTY(EditAnywhere)
+	ATestActor* BulletWorld = nullptr;
+
+	FInputBuffer LocalInputBuffer = FInputBuffer();
 	
 	// this is marked false when the pawn should not send or receive input
 	// i.e. an inactive vehicle or dead player
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	bool IsPossessed = true; // fix this to only be true when possessed
+
+	void ApplyInputs(const FBulletPlayerInput& input) const;
 private:
 	UPROPERTY(EditDefaultsOnly)
 	UStaticMeshComponent* StaticMesh;

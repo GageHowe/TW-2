@@ -136,8 +136,20 @@ void ATestActor::UpdateProcBody(AActor* Body, float Friction, TArray<FVector> a,
 void ATestActor::AddRigidBody(AActor* Body, float Friction, float Restitution, float mass)
 {
 	btRigidBody* rb = AddRigidBody(Body, GetCachedDynamicShapeData(Body, mass), Friction, Restitution);
-	BodyToGUID.Add(rb, GetNetGUIDFromActor(Body)); // not tested yet
-	GUIDToBody.Add(GetNetGUIDFromActor(Body), rb);
+	auto guid = GetNetGUIDFromActor(Body);
+	BodyToGUID.Add(rb, guid); // not tested yet
+	GUIDToBody.Add(guid, rb);
+	// add input buffer?
+}
+
+btRigidBody* ATestActor::AddRigidBodyAndReturn(AActor* Body, float Friction, float Restitution, float mass)
+{
+	btRigidBody* rb = AddRigidBody(Body, GetCachedDynamicShapeData(Body, mass), Friction, Restitution);
+	auto guid = GetNetGUIDFromActor(Body);
+	BodyToGUID.Add(rb, guid); // not tested yet
+	GUIDToBody.Add(guid, rb);
+	// add input buffer?
+	return rb;
 }
 
 // old version
@@ -480,7 +492,6 @@ const ATestActor::CachedDynamicShapeData& ATestActor::GetCachedDynamicShapeData(
 	CachedDynamicShapes.Add(ShapeData);
 
 	return CachedDynamicShapes.Last();
-
 }
 
 btRigidBody* ATestActor::AddRigidBody(AActor* Actor, const ATestActor::CachedDynamicShapeData& ShapeData, float Friction, float Restitution)

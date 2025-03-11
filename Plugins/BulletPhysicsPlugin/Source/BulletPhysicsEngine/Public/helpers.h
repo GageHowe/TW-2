@@ -29,9 +29,17 @@ struct FBulletPlayerInput
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Physics Networking")
 	int64 ObjectID; // get this from FNetworkGUID.ObjectID
+	// is this even needed?
 
 	UPROPERTY(BlueprintReadWrite, Category = "Physics Networking")
 	int32 FrameNumber; // Frame number for this input; is this necessary?
+};
+
+USTRUCT(BlueprintType)
+struct FInputBuffer // a buffer of inputs to be accessed in a circular manner
+{
+	GENERATED_BODY()
+	FBulletPlayerInput PlayerInputs[128];
 };
 
 USTRUCT(BlueprintType) // A FBulletObjectState is the instantaneous state of one object in a frame
@@ -66,4 +74,12 @@ struct FBulletSimulationState
 	{
 		ObjectStates.Add(obj);
 	}
+};
+
+USTRUCT(BlueprintType)
+struct FBulletBroadcastPacket
+{
+	GENERATED_BODY()
+	FBulletSimulationState SimulationState;
+	
 };

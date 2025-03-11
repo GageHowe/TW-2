@@ -42,10 +42,9 @@ public:
 	// bidirectional map
 	TMap<btRigidBody*, FNetworkGUID> BodyToGUID;
 	TMap<FNetworkGUID, btRigidBody*> GUIDToBody;
-
-	TMpscQueue<FBulletPlayerInput> PlayerInputQueue; // for server use
 	
-	
+	// server's list of input Cbuffers for each pawn
+	TMap<FNetworkGUID, FInputBuffer> InputBuffers;
 
 
 	
@@ -147,7 +146,6 @@ public:
 	// 	
 	// }
 	
-
 	// THESE FUNCTIONS ARE PART OF THE API AND LARGELY SHOULDN'T BE TOUCHED
 	void SetupStaticGeometryPhysics(TArray<AActor*> Actors, float Friction, float Restitution);
 	UFUNCTION(BlueprintCallable)
@@ -158,6 +156,8 @@ public:
 	void UpdateProcBody(AActor* Body, float Friction, TArray<FVector> a, TArray<FVector> b, TArray<FVector> c, TArray<FVector> d, float Restitution, int& ID, int PrevID);
 	UFUNCTION(BlueprintCallable)
 	void AddRigidBody(AActor* Body, float Friction, float Restitution,float mass);
+	// new function, no ufunction macro because btRigidBody can't be in BP
+	btRigidBody* AddRigidBodyAndReturn(AActor* Body, float Friction, float Restitution, float mass);
 	UFUNCTION(BlueprintCallable)
 	void UpdatePlayertransform(AActor* player, int ID);
 	UFUNCTION(BlueprintCallable)
