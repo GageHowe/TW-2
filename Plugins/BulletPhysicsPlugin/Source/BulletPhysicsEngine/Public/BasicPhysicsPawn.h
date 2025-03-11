@@ -15,12 +15,17 @@ public:
 	virtual void Tick(float DeltaTime) override;
 	virtual void SetupPlayerInputComponent(class UInputComponent* InputComponent) override;
 	virtual void BeginPlay() override;
+	virtual void PossessedBy(AController* NewController) override;
+	virtual void UnPossessed() override;
 	
 	FVector DirectionalInput = FVector(0, 0, 0);
+	bool PrimaryInput = false;
+	bool SecondaryInput = false;
 	
 	// this is marked false when the pawn should not send or receive input
 	// i.e. an inactive vehicle or dead player
-	bool IsActive = true; // fix this to only be true when possessed
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	bool IsPossessed = true; // fix this to only be true when possessed
 private:
 	UPROPERTY(EditDefaultsOnly)
 	UStaticMeshComponent* StaticMesh;

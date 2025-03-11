@@ -86,7 +86,6 @@ void ATestActor::Tick(float DeltaTime)
 
 
 
-
 void ATestActor::SetupStaticGeometryPhysics(TArray<AActor*> Actors, float Friction, float Restitution)
 {
 	for (AActor* Actor : Actors)

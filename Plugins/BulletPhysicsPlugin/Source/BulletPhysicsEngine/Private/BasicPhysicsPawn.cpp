@@ -27,7 +27,17 @@ void ABasicPhysicsPawn::BeginPlay()
 void ABasicPhysicsPawn::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
-	
+	// send inputs to server
+}
+
+void ABasicPhysicsPawn::PossessedBy(AController* NewController)
+{
+	IsPossessed = true;
+}
+
+void ABasicPhysicsPawn::UnPossessed()
+{
+	IsPossessed = false;
 }
 
 void ABasicPhysicsPawn::SetupPlayerInputComponent(class UInputComponent* ThisInputComponent)
