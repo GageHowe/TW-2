@@ -1,20 +1,9 @@
 ﻿#pragma once
 
 #include "CoreMinimal.h"
-#include "PhysicsEngine/BodySetup.h"
-#include "Containers/Queue.h"
-#include "ThirdParty/BulletPhysicsEngineLibrary/BulletMinimal.h"
-#include "ThirdParty/BulletPhysicsEngineLibrary/src/bthelper.h"
-#include "ThirdParty/BulletPhysicsEngineLibrary/src/motionstate.h"
-#include "ThirdParty/BulletPhysicsEngineLibrary/src/BulletMain.h"
-#include "ThirdParty/BulletPhysicsEngineLibrary/debug/btdebug.h"
-#include "Components/ShapeComponent.h"
 #include <functional>
-
-#include "BlueprintEditor.h"
-#include "Engine/PackageMapClient.h"
+#include "Containers/Queue.h"
 #include "GameFramework/Actor.h"
-#include "Net/UnrealNetwork.h"
 #include "helpers.generated.h"
 
 USTRUCT(BlueprintType)
@@ -37,6 +26,9 @@ struct FBulletPlayerInput
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Physics Networking")
 	bool BoostInput; // 0-1
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Physics Networking")
+	int64 ObjectID; // get this from FNetworkGUID.ObjectID
 
 	UPROPERTY(BlueprintReadWrite, Category = "Physics Networking")
 	int32 FrameNumber; // Frame number for this input; is this necessary?

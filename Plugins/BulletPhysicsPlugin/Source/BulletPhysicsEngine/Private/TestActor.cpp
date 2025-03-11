@@ -55,11 +55,35 @@ void ATestActor::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 	
-	//StepPhysics(DeltaTime, 0);
+	StepPhysics(DeltaTime, 0);
 
 	CurrentFrameNumber++; // increment local frame number
 	randvar = mt->getRandSeed();
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

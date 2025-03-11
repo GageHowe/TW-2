@@ -19,6 +19,9 @@
 #include "GameFramework/Actor.h"
 #include "Net/UnrealNetwork.h"
 #include "helpers.h"
+#include "GameFramework/GameSession.h"
+#include "GameFramework/PlayerState.h"
+#include "GameFramework/GameState.h"
 #include "TestActor.generated.h"
 
 UCLASS()
@@ -124,8 +127,7 @@ public:
 		{ // this happens when playing as standalone
 			FNetworkGUID NetGUID = GetWorld()->GetNetDriver()->GuidCache->GetOrAssignNetGUID(actor);
 			return NetGUID;
-		} else
-		{ // this happens when playing as standalone
+		} else { // this happens when playing as standalone
 			if(GEngine) GEngine->AddOnScreenDebugMessage(-1, 15.0f, FColor::Red, TEXT("GetNetGUIDFromActor returned zeroed"));
 			return FNetworkGUID();
 		}
@@ -139,6 +141,12 @@ public:
 		BodyToGUID.Remove(rigidbody);
 		BtWorld->removeRigidBody(rigidbody);
 	}
+	
+	// void SyncMyFrameNumber()
+	// {
+	// 	
+	// }
+	
 
 	// THESE FUNCTIONS ARE PART OF THE API AND LARGELY SHOULDN'T BE TOUCHED
 	void SetupStaticGeometryPhysics(TArray<AActor*> Actors, float Friction, float Restitution);

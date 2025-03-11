@@ -15,6 +15,7 @@ public:
 	virtual void Tick(float DeltaTime) override;
 	virtual void SetupPlayerInputComponent(class UInputComponent* InputComponent) override;
 	virtual void BeginPlay() override;
+	
 	FVector DirectionalInput = FVector(0, 0, 0);
 private:
 	UPROPERTY(EditDefaultsOnly)
@@ -25,18 +26,9 @@ private:
 protected:
 	UPROPERTY(EditDefaultsOnly)
 	ATestActor* world;
-	
-	void SetForwardInput(float Value)
-	{
-		// confirmed to work
-		// if (GEngine) { GEngine->AddOnScreenDebugMessage(-1,5,FColor::Red,"Forward Input"); }
-	}
-	void SetRightInput(float Value)
-	{
-		
-	}
-	void SetUpInput(float Value)
-	{
-		
-	}
+
+	// set inputs on axis event
+	void SetForwardInput(float Value) { DirectionalInput.X = Value; }
+	void SetRightInput(float Value) { DirectionalInput.Y = Value; }
+	void SetUpInput(float Value) { DirectionalInput.Z = Value; }
 };
