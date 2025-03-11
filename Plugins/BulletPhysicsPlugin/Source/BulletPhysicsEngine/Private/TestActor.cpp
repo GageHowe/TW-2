@@ -110,12 +110,9 @@ void ATestActor::UpdateProcBody(AActor* Body, float Friction, TArray<FVector> a,
 	ID = BtWorld->getNumCollisionObjects() - 1;
 }
 
-void ATestActor::AddRigidBody(AActor* Body, float Friction, float Restitution, int& ID,float mass)
+void ATestActor::AddRigidBody(AActor* Body, float Friction, float Restitution, float mass)
 {
 	btRigidBody* rb = AddRigidBody(Body, GetCachedDynamicShapeData(Body, mass), Friction, Restitution);
-	ID = BtRigidBodies.Num() - 1;
-
-	// connect references
 	BodyToGUID.Add(rb, GetNetGUIDFromActor(Body)); // not tested yet
 	GUIDToBody.Add(GetNetGUIDFromActor(Body), rb);
 }

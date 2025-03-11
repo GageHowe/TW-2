@@ -121,13 +121,13 @@ public:
 	FNetworkGUID GetNetGUIDFromActor(AActor* actor) const
 	{
 		if (actor && GetWorld()->GetNetDriver())
-		{
+		{ // this happens when playing as standalone
 			FNetworkGUID NetGUID = GetWorld()->GetNetDriver()->GuidCache->GetOrAssignNetGUID(actor);
 			return NetGUID;
 		} else
-		{
+		{ // this happens when playing as standalone
 			if(GEngine) GEngine->AddOnScreenDebugMessage(-1, 15.0f, FColor::Red, TEXT("GetNetGUIDFromActor returned zeroed"));
-			return FNetworkGUID(); // objectID 0
+			return FNetworkGUID();
 		}
 	}
 
@@ -135,7 +135,7 @@ public:
 	// Eg. when destroying an actor
 	void DestroyRigidBody(btRigidBody* rigidbody)
 	{
-		GUIDToBody.Remove(BodyToGUID.Find(rigidbody);
+		GUIDToBody.Remove(*BodyToGUID.Find(rigidbody));
 		BodyToGUID.Remove(rigidbody);
 		BtWorld->removeRigidBody(rigidbody);
 	}
@@ -149,7 +149,7 @@ public:
 	UFUNCTION(BlueprintCallable)
 	void UpdateProcBody(AActor* Body, float Friction, TArray<FVector> a, TArray<FVector> b, TArray<FVector> c, TArray<FVector> d, float Restitution, int& ID, int PrevID);
 	UFUNCTION(BlueprintCallable)
-	void AddRigidBody(AActor* Body, float Friction, float Restitution, int& ID,float mass);
+	void AddRigidBody(AActor* Body, float Friction, float Restitution,float mass);
 	UFUNCTION(BlueprintCallable)
 	void UpdatePlayertransform(AActor* player, int ID);
 	UFUNCTION(BlueprintCallable)

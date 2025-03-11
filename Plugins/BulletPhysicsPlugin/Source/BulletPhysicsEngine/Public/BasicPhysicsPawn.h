@@ -1,6 +1,7 @@
 ﻿#pragma once
 
 #include "CoreMinimal.h"
+#include "TestActor.h"
 #include "Camera/CameraComponent.h"
 #include "GameFramework/Pawn.h"
 #include "BasicPhysicsPawn.generated.h"
@@ -22,6 +23,9 @@ private:
 	UPROPERTY(EditDefaultsOnly)
 	UCameraComponent* Camera;
 protected:
+	UPROPERTY(EditDefaultsOnly)
+	ATestActor* world;
+	
 	void SetForwardInput(float Value)
 	{
 		// confirmed to work
