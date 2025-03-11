@@ -112,9 +112,20 @@ void ATestActor::UpdateProcBody(AActor* Body, float Friction, TArray<FVector> a,
 
 void ATestActor::AddRigidBody(AActor* Body, float Friction, float Restitution, int& ID,float mass)
 {
-	AddRigidBody(Body, GetCachedDynamicShapeData(Body, mass), Friction, Restitution);
+	btRigidBody* rb = AddRigidBody(Body, GetCachedDynamicShapeData(Body, mass), Friction, Restitution);
 	ID = BtRigidBodies.Num() - 1;
+
+	// connect references
+	BodyToGUID.Add(rb, GetNetGUIDFromActor(Body)); // not tested yet
+	GUIDToBody.Add(GetNetGUIDFromActor(Body), rb);
 }
+
+// old version
+// void ATestActor::AddRigidBody(AActor* Body, float Friction, float Restitution, int& ID,float mass)
+// {
+// 	AddRigidBody(Body, GetCachedDynamicShapeData(Body, mass), Friction, Restitution);
+// 	ID = BtRigidBodies.Num() - 1;
+// }
 
 void ATestActor::UpdatePlayertransform(AActor* player, int ID)
 {
@@ -529,6 +540,4 @@ void ATestActor::ResetSim()
 	{
 		BtWorld->addRigidBody(BtRigidBodies[i]);
 	}
-	
-
 }

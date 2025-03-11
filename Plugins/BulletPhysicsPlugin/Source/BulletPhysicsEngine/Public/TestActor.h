@@ -14,6 +14,7 @@
 #include <functional>
 #include <queue>
 #include "BlueprintEditor.h"
+#include "HairStrandsInterface.h"
 #include "Engine/PackageMapClient.h"
 #include "GameFramework/Actor.h"
 #include "Net/UnrealNetwork.h"
@@ -35,8 +36,12 @@ public:
 	int32 CurrentFrameNumber = 0;	// Global current frame number
 	const float FixedDeltaTime = 1.0f / 60.0f;
 
-	TMpscQueue<FBulletPlayerInput> PlayerInputQueue; // for server use
+	// bidirectional map
+	TMap<btRigidBody*, FNetworkGUID> BodyToGUID;
+	TMap<FNetworkGUID, btRigidBody*> GUIDToBody;
 
+	TMpscQueue<FBulletPlayerInput> PlayerInputQueue; // for server use
+	
 	
 
 
@@ -124,6 +129,15 @@ public:
 			if(GEngine) GEngine->AddOnScreenDebugMessage(-1, 15.0f, FColor::Red, TEXT("GetNetGUIDFromActor returned zeroed"));
 			return FNetworkGUID(); // objectID 0
 		}
+	}
+
+	// use this to completely remove the body and references to it
+	// Eg. when destroying an actor
+	void DestroyRigidBody(btRigidBody* rigidbody)
+	{
+		GUIDToBody.Remove(BodyToGUID.Find(rigidbody);
+		BodyToGUID.Remove(rigidbody);
+		BtWorld->removeRigidBody(rigidbody);
 	}
 
 	// THESE FUNCTIONS ARE PART OF THE API AND LARGELY SHOULDN'T BE TOUCHED
