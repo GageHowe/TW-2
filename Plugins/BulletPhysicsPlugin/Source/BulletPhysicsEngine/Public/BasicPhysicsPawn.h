@@ -17,6 +17,10 @@ public:
 	virtual void BeginPlay() override;
 	
 	FVector DirectionalInput = FVector(0, 0, 0);
+	
+	// this is marked false when the pawn should not send or receive input
+	// i.e. an inactive vehicle or dead player
+	bool IsActive = true; // fix this to only be true when possessed
 private:
 	UPROPERTY(EditDefaultsOnly)
 	UStaticMeshComponent* StaticMesh;
