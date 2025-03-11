@@ -24,6 +24,7 @@ void ABasicPhysicsPawn::Tick(float DeltaTime)
 void ABasicPhysicsPawn::SetupPlayerInputComponent(class UInputComponent* ThisInputComponent)
 {
 	Super::SetupPlayerInputComponent(ThisInputComponent);
-	
+	InputComponent->BindAxis(TEXT("MoveForward"), this, &ABasicPhysicsPawn::SetForwardInput);
+	InputComponent->BindAxis(TEXT("MoveRight"), this, &ABasicPhysicsPawn::SetRightInput);
+	InputComponent->BindAxis(TEXT("MoveUp"), this, &ABasicPhysicsPawn::SetUpInput);
 }
-
