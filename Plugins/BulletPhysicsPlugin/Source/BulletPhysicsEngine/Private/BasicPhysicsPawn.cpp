@@ -22,6 +22,7 @@ void ABasicPhysicsPawn::BeginPlay()
 	UGameplayStatics::GetAllActorsOfClass(GetWorld(), ATestActor::StaticClass(), worlds);
 	world = Cast<ATestActor>(worlds[0]); // this will crash if no world is present
 										// if you ain't crashed, the reference is valid
+	BulletWorld = world;
 	btRigidBody* rb = world->AddRigidBodyAndReturn(this, 0.2, 0.2, 1);
 	if (!rb) { GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Red, TEXT("WARNING RigidBody ptr is null")); }
 	MyRigidBody = rb;
@@ -31,23 +32,35 @@ void ABasicPhysicsPawn::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-	// locally simulate inputs
 	if (IsLocallyControlled())
 	{
+		// locally simulate inputs
 		FBulletPlayerInput input = FBulletPlayerInput();
 		input.MovementInput = DirectionalInput;
-		
 		ApplyInputs(input);
-		
-		// LocalInputBuffer.PlayerInputs[...
+
+		// send inputs to server
+		// FNetworkGUID id = BulletWorld->GetNetGUIDFromActor(this);
+		// BulletWorld->SR_SendInputsByID(id.ObjectId, input);
 	} else if (HasAuthority())
 	{
 		// BulletWorld->SendInputsToServer
 		// printf("slkdf");
 	}
-	
-	// send inputs to server
-	// BulletWorld->
+
+	// debug stuff
+	if (testdebug)
+	{
+		if (IsLocallyControlled())
+		{
+			auto id = BulletWorld->GetNetGUIDFromActor(this).ObjectId;
+			GEngine->AddOnScreenDebugMessage(-1, 0.5f, FColor::Yellow, FString::Printf(TEXT("Client: ID: %llu"), id));
+		} else /*if (HasAuthority())*/
+		{
+			auto id = BulletWorld->GetNetGUIDFromActor(this).ObjectId;
+			GEngine->AddOnScreenDebugMessage(-1, 0.5f, FColor::Blue, FString::Printf(TEXT("Server: ID: %llu"), id));
+		}
+	}
 }
 
 // right now, this just accelerates the pawn, but that's fine for now
@@ -75,4 +88,10 @@ void ABasicPhysicsPawn::SetupPlayerInputComponent(class UInputComponent* ThisInp
 	InputComponent->BindAxis(TEXT("MoveForward"), this, &ABasicPhysicsPawn::SetForwardInput);
 	InputComponent->BindAxis(TEXT("MoveRight"), this, &ABasicPhysicsPawn::SetRightInput);
 	InputComponent->BindAxis(TEXT("MoveUp"), this, &ABasicPhysicsPawn::SetUpInput);
+	InputComponent->BindAction(TEXT("Interact"), IE_Pressed, this, &ABasicPhysicsPawn::DebugMesssage);
+}
+
+void ABasicPhysicsPawn::DebugMesssage()
+{
+	testdebug = true;
 }

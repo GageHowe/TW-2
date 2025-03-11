@@ -16,7 +16,7 @@ struct Ftris
 	FVector d;
 };
 
-USTRUCT(BlueprintType)
+USTRUCT(BlueprintType, Blueprintable)
 struct FBulletPlayerInput
 {
 	GENERATED_BODY()
@@ -83,3 +83,4 @@ struct FBulletBroadcastPacket
 	FBulletSimulationState SimulationState;
 	
 };
+

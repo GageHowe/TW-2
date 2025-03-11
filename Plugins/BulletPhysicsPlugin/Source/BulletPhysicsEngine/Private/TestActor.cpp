@@ -61,6 +61,12 @@ void ATestActor::Tick(float DeltaTime)
 	randvar = mt->getRandSeed();
 }
 
+void ATestActor::SR_SendInputsByID_Implementation(int64 objectID, FBulletPlayerInput input)
+{
+	GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Blue, TEXT("Received an input from a client"));
+	// todo: add the input to the corresponding buffer
+}
+
 
 
 

@@ -107,6 +107,12 @@ protected:
 public:	
 	virtual void Tick(float DeltaTime) override;
 
+	UFUNCTION(BlueprintCallable, Server, Reliable)
+	void SR_SendInputsByID(int64 objectID, FBulletPlayerInput input);
+	
+	// UFUNCTION(BlueprintCallable, Server, Reliable)
+	// void SR_SendInputs2(FNetworkGUID guid, FBulletPlayerInput input);
+
 	// THE FOLLOWING FUNCTIONS ARE FOR SYNCING ACTORS WITH UNIQUE IDs. FNetworkGUID is a unique, replicated ID for UObjects.
 	AActor* GetActorFromNetGUID(FNetworkGUID guid)
 	{
