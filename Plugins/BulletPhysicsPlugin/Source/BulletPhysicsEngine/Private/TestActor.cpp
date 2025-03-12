@@ -63,7 +63,8 @@ void ATestActor::Tick(float DeltaTime)
 
 	CurrentFrameNumber++; // increment local frame number
 	randvar = mt->getRandSeed();
-	
+	// CurrentState = GetCurrentState();
+	// MC_SendStateToClients(CurrentState, )
 }
 
 void ATestActor::SR_test_Implementation()
@@ -98,6 +99,31 @@ void ATestActor::SendInputToServer(AActor* actor, FBulletPlayerInput input)
 
 	GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Yellow, FString::Printf(TEXT("Server: total inputs in buffer: %i"), SumMyInputBuffers()));
 }
+
+void ATestActor::MC_SendStateToClients_Implementation(FBulletSimulationState State, const TArray<AActor*>& InputActors,
+	const TArray<FBulletPlayerInput>& PlayerInputs)
+{
+	if (!HasAuthority())
+	{
+		// Reconstruct the map from the arrays
+		TMap<AActor*, FBulletPlayerInput> LastActorInputs;
+		const int32 Count = FMath::Min(InputActors.Num(), PlayerInputs.Num());
+		for (int32 i = 0; i < Count; ++i)
+		{
+			if (InputActors[i] != nullptr)
+			{
+				LastActorInputs.Add(InputActors[i], PlayerInputs[i]);
+			}
+		}
+		
+		// TODO APPLY INPUTS
+		// TODO RESIMULATE IF NECESSARY
+		
+		// // Process the state and inputs
+		// ProcessSimulationUpdate(State, LastActorInputs);
+	}
+}
+
 
 void ATestActor::test2()
 {

@@ -64,16 +64,32 @@ public:
 		return TotalEntries;
 	}
 
-	
-	
-	// TODO
 	UFUNCTION(BlueprintCallable)
-	FBulletSimulationState CollectState()
+	FBulletSimulationState GetCurrentState() const
 	{
-		// get all object states
-		return CurrentState;
-	}
+		FBulletSimulationState thisState;
+		thisState.FrameNumber = CurrentFrameNumber;
+		// construct and add all object states
+		for (const auto& tuple : BodyToActor)
+		{
+			FBulletObjectState os;
+			btRigidBody* body = tuple.Key;
+
+			os.Transform = BulletHelpers::ToUE(body->getWorldTransform(), GetActorLocation());
+			os.Velocity = BulletHelpers::ToUEDir(body->getLinearVelocity(), true);
+			os.AngularVelocity = BulletHelpers::ToUEDir(body->getAngularVelocity(), true);
 	
+			thisState.ObjectStates.Add(os);
+		}
+		return thisState;
+	}
+
+	// find a way to send map of actor*s to inputs
+	UFUNCTION(BlueprintCallable, NetMulticast, Unreliable)
+	// void MC_SendStateToClients(FBulletSimulationState state, TMap<AActor*, FBulletPlayerInput> LastActorInputs);
+	// void MC_SendStateToClients(FBulletSimulationState state, TArray<TPair<AActor*, FBulletPlayerInput>> inputs);
+	void MC_SendStateToClients(FBulletSimulationState State, const TArray<AActor*>& InputActors, const TArray<FBulletPlayerInput>& PlayerInputs);
+
 	// Global objects
 	btCollisionConfiguration* BtCollisionConfig;
 	btCollisionDispatcher* BtCollisionDispatcher;
@@ -148,11 +164,6 @@ public:
 		ActorToBody.Remove(*BodyToActor.Find(rigidbody));
 		BtWorld->removeRigidBody(rigidbody);
 	}
-	
-	// void SyncMyFrameNumber()
-	// {
-	// 	
-	// }
 	
 	// THESE FUNCTIONS ARE PART OF THE API AND LARGELY SHOULDN'T BE TOUCHED
 	void SetupStaticGeometryPhysics(TArray<AActor*> Actors, float Friction, float Restitution);

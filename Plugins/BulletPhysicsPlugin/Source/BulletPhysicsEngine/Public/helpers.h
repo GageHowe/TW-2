@@ -64,13 +64,49 @@ struct FBulletSimulationState
 	int32 FrameNumber;
 };
 
-USTRUCT(BlueprintType)
-struct FBulletBroadcastPacket
+/**
+ * Converts a TMap to separate key and value arrays for RPC transmission
+ * 
+ * @param InMap - The map to convert
+ * @param OutKeys - Array to store the keys
+ * @param OutValues - Array to store the values
+ */
+template<typename KeyType, typename ValueType>
+	static void MapToArrays(const TMap<KeyType, ValueType>& InMap, TArray<KeyType>& OutKeys, TArray<ValueType>& OutValues)
 {
-	GENERATED_BODY()
-	UPROPERTY(BlueprintReadWrite)
-	FBulletSimulationState SimulationState;
-	UPROPERTY(BlueprintReadWrite)
-	TMap<AActor*, FBulletPlayerInput> PlayerInputs;
-};
-
+	const int32 ElementCount = InMap.Num();
+	OutKeys.Empty(ElementCount);
+	OutValues.Empty(ElementCount);
+        
+	for (const TPair<KeyType, ValueType>& Pair : InMap)
+	{
+		OutKeys.Add(Pair.Key);
+		OutValues.Add(Pair.Value);
+	}
+}
+    
+/**
+ * Converts separate key and value arrays back to a TMap after RPC transmission
+ * 
+ * @param InKeys - Array of keys
+ * @param InValues - Array of values
+ * @return TMap created from the arrays
+ */
+template<typename KeyType, typename ValueType>
+static TMap<KeyType, ValueType> ArraysToMap(const TArray<KeyType>& InKeys, const TArray<ValueType>& InValues)
+{
+	TMap<KeyType, ValueType> Result;
+        
+	const int32 KeyCount = InKeys.Num();
+	const int32 ValueCount = InValues.Num();
+	const int32 ElementCount = FMath::Min(KeyCount, ValueCount);
+        
+	Result.Reserve(ElementCount);
+        
+	for (int32 i = 0; i < ElementCount; ++i)
+	{
+		Result.Add(InKeys[i], InValues[i]);
+	}
+        
+	return Result;
+}
