@@ -62,7 +62,7 @@ void ATestActor::Tick(float DeltaTime)
 	randvar = mt->getRandSeed();
 }
 
-void ATestActor::SR_SendInputsByID_Implementation(int64 objectID, FBulletPlayerInput input)
+void ATestActor::SR_SendInputsByID_Implementation(AActor* actor, FBulletPlayerInput input)
 {
 	GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Blue, TEXT("Received an input from a client"));
 	// todo: add the input to the corresponding buffer
@@ -143,9 +143,6 @@ void ATestActor::UpdateProcBody(AActor* Body, float Friction, TArray<FVector> a,
 void ATestActor::AddRigidBody(AActor* actor, float Friction, float Restitution, float mass)
 {
 	btRigidBody* rb = AddRigidBody(actor, GetCachedDynamicShapeData(actor, mass), Friction, Restitution);
-	// auto guid = GetNetGUIDFromActor(Body);
-	// BodyToGUID.Add(rb, guid); // not tested yet
-	// GUIDToBody.Add(guid, rb);
 	BodyToActor.Add(rb, actor);
 	ActorToBody.Add(actor, rb);
 	// add input buffer?
@@ -154,9 +151,6 @@ void ATestActor::AddRigidBody(AActor* actor, float Friction, float Restitution, 
 btRigidBody* ATestActor::AddRigidBodyAndReturn(AActor* Body, float Friction, float Restitution, float mass)
 {
 	btRigidBody* rb = AddRigidBody(Body, GetCachedDynamicShapeData(Body, mass), Friction, Restitution);
-	// auto guid = GetNetGUIDFromActor(Body);
-	// BodyToGUID.Add(rb, guid); // not tested yet
-	// GUIDToBody.Add(guid, rb);
 	BodyToActor.Add(rb, Body);
 	ActorToBody.Add(Body, rb);
 	// add input buffer?

@@ -30,8 +30,6 @@ public:
 	
 	UPROPERTY(EditAnywhere)
 	ATestActor* BulletWorld = nullptr;
-
-	FInputBuffer LocalInputBuffer = FInputBuffer();
 	
 	// this is marked false when the pawn should not send or receive input
 	// i.e. an inactive vehicle or dead player

@@ -57,8 +57,7 @@ void ABasicPhysicsPawn::Tick(float DeltaTime)
 		ApplyInputs(input);
 
 		// send inputs to server
-		// FNetworkGUID id = BulletWorld->GetNetGUIDFromActor(this);
-		// BulletWorld->SR_SendInputsByID(id.ObjectId, input);
+		BulletWorld->SR_SendInputsByID(this, input);
 	} else if (HasAuthority())
 	{
 		// BulletWorld->SendInputsToServer

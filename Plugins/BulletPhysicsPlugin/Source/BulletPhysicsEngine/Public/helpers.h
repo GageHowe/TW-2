@@ -21,25 +21,18 @@ struct FBulletPlayerInput
 {
 	GENERATED_BODY()
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Physics Networking")
+	UPROPERTY(BlueprintReadWrite)
 	FVector MovementInput = {0,0,0}; // 0-1 on all axes, in local space (x,y,z)
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Physics Networking")
+	UPROPERTY(BlueprintReadWrite)
 	bool BoostInput = false; // 0-1
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Physics Networking")
-	int64 ObjectID = 0; // get this from FNetworkGUID.ObjectID
+	UPROPERTY(BlueprintReadWrite)
+	AActor* Player = nullptr;
 	// is this even needed?
 
-	UPROPERTY(BlueprintReadWrite, Category = "Physics Networking")
+	UPROPERTY(BlueprintReadWrite)
 	int32 FrameNumber = 0; // Frame number for this input; is this necessary?
-};
-
-USTRUCT(BlueprintType)
-struct FInputBuffer // a buffer of inputs to be accessed in a circular manner
-{
-	GENERATED_BODY()
-	FBulletPlayerInput PlayerInputs[128];
 };
 
 USTRUCT(BlueprintType) // A FBulletObjectState is the instantaneous state of one object in a frame
@@ -47,19 +40,19 @@ struct FBulletObjectState
 {
 	GENERATED_BODY()
 	
-	UPROPERTY(BlueprintReadWrite, Category = "Physics Networking")
+	UPROPERTY(BlueprintReadWrite)
 	int32 ObjectID; // is this really necessary?
 
-	UPROPERTY(BlueprintReadWrite, Category = "Physics Networking")
+	UPROPERTY(BlueprintReadWrite)
 	FTransform Transform;
 
-	UPROPERTY(BlueprintReadWrite, Category = "Physics Networking")
+	UPROPERTY(BlueprintReadWrite)
 	FVector Velocity;
 
-	UPROPERTY(BlueprintReadWrite, Category = "Physics Networking")
+	UPROPERTY(BlueprintReadWrite)
 	FVector AngularVelocity;
 
-	UPROPERTY(BlueprintReadWrite, Category = "Physics Networking")
+	UPROPERTY(BlueprintReadWrite)
 	int32 FrameNumber;
 };
 

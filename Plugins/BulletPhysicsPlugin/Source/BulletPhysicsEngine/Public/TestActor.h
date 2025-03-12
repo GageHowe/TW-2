@@ -40,17 +40,11 @@ public:
 	const float FixedDeltaTime = 1.0f / 60.0f;
 
 	// bidirectional map
-	// TMap<btRigidBody*, FNetworkGUID> BodyToGUID;
-	// TMap<FNetworkGUID, btRigidBody*> GUIDToBody;
-
 	TMap<btRigidBody*, AActor*> BodyToActor;
 	TMap<AActor*, btRigidBody*> ActorToBody;
 	
 	// server's list of input Cbuffers for each pawn
-	// TMap<FNetworkGUID, FInputBuffer> InputBuffers;
-
-	TMap<AActor*, FInputBuffer> InputBuffers;
-
+	TMap<AActor*, TCircularBuffer<FBulletPlayerInput>> InputBuffers;
 	
 	// Global objects
 	btCollisionConfiguration* BtCollisionConfig;
@@ -112,43 +106,13 @@ public:
 	virtual void Tick(float DeltaTime) override;
 
 	UFUNCTION(BlueprintCallable, Server, Reliable)
-	void SR_SendInputsByID(int64 objectID, FBulletPlayerInput input);
+	void SR_SendInputsByID(AActor* actor, FBulletPlayerInput input);
 	
-	// UFUNCTION(BlueprintCallable, Server, Reliable)
-	// void SR_SendInputs2(FNetworkGUID guid, FBulletPlayerInput input);
-
-	// THE FOLLOWING FUNCTIONS ARE FOR SYNCING ACTORS WITH UNIQUE IDs. FNetworkGUID is a unique, replicated ID for UObjects.
-	// But I recently learned Actor*s are translated when sent via RPC... These may not be needed
-	// AActor* GetActorFromNetGUID(FNetworkGUID guid)
-	// {
-	// 	UNetDriver* driver = GetWorld()->GetNetDriver();
-	// 	FNetGUIDCache* cache = driver->GuidCache.Get();
-	// 	if (driver && cache)
-	// 	{
-	// 		UObject *obj = cache->GetObjectFromNetGUID(guid, false);
-	// 		AActor* actor = Cast<AActor>(obj);
-	// 	}
-	// 	if(GEngine) GEngine->AddOnScreenDebugMessage(-1, 15.0f, FColor::Red, TEXT("GetActorFromNetGUID returned null"));
-	// 	return nullptr;
-	// }
-	// FNetworkGUID GetNetGUIDFromActor(AActor* actor) const
-	// {
-	// 	if (actor && GetWorld()->GetNetDriver())
-	// 	{ // this happens when playing as standalone
-	// 		FNetworkGUID NetGUID = GetWorld()->GetNetDriver()->GuidCache->GetOrAssignNetGUID(actor);
-	// 		return NetGUID;
-	// 	} else { // this happens when playing as standalone
-	// 		if(GEngine) GEngine->AddOnScreenDebugMessage(-1, 15.0f, FColor::Red, TEXT("GetNetGUIDFromActor returned zeroed"));
-	// 		return FNetworkGUID();
-	// 	}
-	// }
 
 	// use this to completely remove the body and references to it
 	// E.g. when destroying an actor
 	void DestroyRigidBody(btRigidBody* rigidbody)
 	{
-		// GUIDToBody.Remove(*BodyToGUID.Find(rigidbody));
-		// BodyToGUID.Remove(rigidbody);
 
 		BodyToActor.Remove(rigidbody);
 		ActorToBody.Remove(*BodyToActor.Find(rigidbody));
