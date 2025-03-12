@@ -44,6 +44,9 @@ public:
 	void ServerTest();
 	UFUNCTION(Server, Reliable)
 	void ServerTestSimple();
+
+	UFUNCTION(Server, Unreliable)
+	void SendInputsToServer(AActor* actor, FBulletPlayerInput input);
 private:
 	UPROPERTY(EditDefaultsOnly)
 	UStaticMeshComponent* StaticMesh;

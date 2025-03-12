@@ -75,11 +75,28 @@ void ATestActor::SR_test_Implementation()
 	}
 }
 
-void ATestActor::SR_SendInputsByID_Implementation(AActor* actor, FBulletPlayerInput input)
+void ATestActor::SendInputToServer(AActor* actor, FBulletPlayerInput input)
 {
-	GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Green, TEXT("sent rpc"));
-	GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Blue, TEXT("Received an input from a client"));
-	// todo: add the input to the corresponding buffer
+	GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Yellow, FString::Printf(TEXT("recieved: %i"), true));
+	// If this actor doesn't have an input buffer yet, create one
+	if (!InputBuffers.Contains(actor))
+	{
+		TCircularBuffer<FBulletPlayerInput> NewBuffer(32);
+		InputBuffers.Add(actor, NewBuffer);
+		InputIndices.Add(actor, 0);  // Start at index 0
+	}
+    
+	// Get reference to the buffer and the current index
+	TCircularBuffer<FBulletPlayerInput>& Buffer = InputBuffers[actor];
+	uint32& CurrentIndex = InputIndices[actor];
+    
+	// Write the input at the current index
+	Buffer[CurrentIndex] = input;
+    
+	// Update to the next index using the buffer's method
+	CurrentIndex = Buffer.GetNextIndex(CurrentIndex);
+
+	GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Yellow, FString::Printf(TEXT("Server: total inputs in buffer: %i"), SumMyInputBuffers()));
 }
 
 void ATestActor::test2()

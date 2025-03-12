@@ -41,7 +41,7 @@ struct FBulletObjectState
 	GENERATED_BODY()
 	
 	UPROPERTY(BlueprintReadWrite)
-	int32 ObjectID; // is this really necessary?
+	AActor* Actor = nullptr;
 
 	UPROPERTY(BlueprintReadWrite)
 	FTransform Transform;
@@ -62,18 +62,15 @@ struct FBulletSimulationState
 	GENERATED_BODY()
 	TArray<FBulletObjectState> ObjectStates;
 	int32 FrameNumber;
-
-	void insert(FBulletObjectState obj, int num)
-	{
-		ObjectStates.Add(obj);
-	}
 };
 
 USTRUCT(BlueprintType)
 struct FBulletBroadcastPacket
 {
 	GENERATED_BODY()
+	UPROPERTY(BlueprintReadWrite)
 	FBulletSimulationState SimulationState;
-	
+	UPROPERTY(BlueprintReadWrite)
+	TMap<AActor*, FBulletPlayerInput> PlayerInputs;
 };
 

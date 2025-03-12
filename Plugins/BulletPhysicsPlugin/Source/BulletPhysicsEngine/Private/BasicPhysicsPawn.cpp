@@ -61,14 +61,10 @@ void ABasicPhysicsPawn::Tick(float DeltaTime)
 
 	if (IsLocallyControlled())
 	{
-		// locally simulate inputs
 		FBulletPlayerInput input = FBulletPlayerInput();
 		input.MovementInput = DirectionalInput;
 		ApplyInputs(input);
-		
-	} else if (HasAuthority())
-	{
-
+		SendInputsToServer(this, input);
 	}
 }
 
@@ -131,11 +127,6 @@ void ABasicPhysicsPawn::SetupPlayerInputComponent(class UInputComponent* ThisInp
 
 void ABasicPhysicsPawn::EnableDebug()
 {
-	// testdebug = true;
-	GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Yellow, FString::Printf(TEXT("bReplicates: %hhu"), bReplicates));
-	GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Red, TEXT("trying to call rpc"));
-	
-	// Check controller status
 	if (GetController())
 	{
 		GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Yellow, 
@@ -150,4 +141,7 @@ void ABasicPhysicsPawn::EnableDebug()
 	ServerTest();
 }
 
-
+void ABasicPhysicsPawn::SendInputsToServer_Implementation(AActor* actor, FBulletPlayerInput input)
+{
+	BulletWorld->SendInputToServer(this, input);
+}

@@ -45,8 +45,34 @@ public:
 	
 	// server's list of input Cbuffers for each pawn
 	TMap<AActor*, TCircularBuffer<FBulletPlayerInput>> InputBuffers;
-
+	// a member variable to track the current CBuffer index for each actor
+	TMap<AActor*, uint32> InputIndices;
+	
 	virtual void GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const override;
+
+	UFUNCTION()
+	void SendInputToServer(AActor* actor, FBulletPlayerInput input);
+
+	UFUNCTION(BlueprintCallable)
+	int SumMyInputBuffers() const
+	{
+		int TotalEntries = 0;
+		for (const auto& Pair : InputBuffers)
+		{
+			TotalEntries += Pair.Value.Capacity();
+		}
+		return TotalEntries;
+	}
+
+	
+	
+	// TODO
+	UFUNCTION(BlueprintCallable)
+	FBulletSimulationState CollectState()
+	{
+		// get all object states
+		return CurrentState;
+	}
 	
 	// Global objects
 	btCollisionConfiguration* BtCollisionConfig;
@@ -106,10 +132,7 @@ protected:
 	virtual void BeginPlay() override;
 public:	
 	virtual void Tick(float DeltaTime) override;
-
-	UFUNCTION(BlueprintCallable, Server, Reliable)
-	void SR_SendInputsByID(AActor* actor, FBulletPlayerInput input);
-
+	
 	UFUNCTION(BlueprintCallable, Server, Reliable)
 	void SR_test();
 
