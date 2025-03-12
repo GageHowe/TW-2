@@ -19,7 +19,7 @@ ABasicPhysicsPawn::ABasicPhysicsPawn()
 void ABasicPhysicsPawn::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
-	DOREPLIFETIME(ABasicPhysicsPawn, testdebug);
+	// DOREPLIFETIME(ABasicPhysicsPawn, testdebug);
 }
 
 void ABasicPhysicsPawn::BeginPlay()
@@ -57,7 +57,7 @@ void ABasicPhysicsPawn::Tick(float DeltaTime)
 		ApplyInputs(input);
 
 		// send inputs to server
-		FNetworkGUID id = BulletWorld->GetNetGUIDFromActor(this);
+		// FNetworkGUID id = BulletWorld->GetNetGUIDFromActor(this);
 		// BulletWorld->SR_SendInputsByID(id.ObjectId, input);
 	} else if (HasAuthority())
 	{
@@ -66,15 +66,7 @@ void ABasicPhysicsPawn::Tick(float DeltaTime)
 	}
 
 	// FObjectKey
-
-	// debug stuff
-	if (testdebug)
-	{
-		if (IsLocallyControlled())
-		{
-			auto id = BulletWorld->GetNetGUIDFromActor(this).ObjectId;
-			GEngine->AddOnScreenDebugMessage(-1, 0.5f, FColor::Yellow, FString::Printf(TEXT("ID: %llu"), id));
-		}
+	
 }
 
 // right now, this just accelerates the pawn, but that's fine for now
@@ -102,11 +94,11 @@ void ABasicPhysicsPawn::SetupPlayerInputComponent(class UInputComponent* ThisInp
 	InputComponent->BindAxis(TEXT("MoveForward"), this, &ABasicPhysicsPawn::SetForwardInput);
 	InputComponent->BindAxis(TEXT("MoveRight"), this, &ABasicPhysicsPawn::SetRightInput);
 	InputComponent->BindAxis(TEXT("MoveUp"), this, &ABasicPhysicsPawn::SetUpInput);
-	InputComponent->BindAction(TEXT("Interact"), IE_Pressed, this, &ABasicPhysicsPawn::EnableDebug);
+	// InputComponent->BindAction(TEXT("Interact"), IE_Pressed, this, &ABasicPhysicsPawn::EnableDebug);
 }
 
-void ABasicPhysicsPawn::EnableDebug()
-{
-	testdebug = true;
-}
-
+// void ABasicPhysicsPawn::EnableDebug()
+// {
+// 	testdebug = true;
+// }
+//

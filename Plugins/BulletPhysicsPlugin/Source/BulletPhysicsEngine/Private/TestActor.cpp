@@ -142,7 +142,7 @@ void ATestActor::UpdateProcBody(AActor* Body, float Friction, TArray<FVector> a,
 
 void ATestActor::AddRigidBody(AActor* actor, float Friction, float Restitution, float mass)
 {
-	btRigidBody* rb = AddRigidBody(Body, GetCachedDynamicShapeData(Body, mass), Friction, Restitution);
+	btRigidBody* rb = AddRigidBody(actor, GetCachedDynamicShapeData(actor, mass), Friction, Restitution);
 	// auto guid = GetNetGUIDFromActor(Body);
 	// BodyToGUID.Add(rb, guid); // not tested yet
 	// GUIDToBody.Add(guid, rb);

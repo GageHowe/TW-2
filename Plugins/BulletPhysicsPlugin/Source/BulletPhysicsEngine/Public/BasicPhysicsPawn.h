@@ -39,9 +39,8 @@ public:
 	bool IsPossessed = true; // fix this to only be true when possessed
 
 	void ApplyInputs(const FBulletPlayerInput& input) const;
-	void EnableDebug();
-	
-	bool testdebug = false;
+	// void EnableDebug();
+	//
 private:
 	UPROPERTY(EditDefaultsOnly)
 	UStaticMeshComponent* StaticMesh;
