@@ -3,6 +3,7 @@
 
 #include "TestActor.h"
 
+#include "BasicPhysicsPawn.h"
 #include "LevelInstance/LevelInstanceTypes.h"
 #include "Types/AttributeStorage.h"
 
@@ -65,10 +66,33 @@ void ATestActor::Tick(float DeltaTime)
 	randvar = mt->getRandSeed();
 	// CurrentState = GetCurrentState();
 	// MC_SendStateToClients(CurrentState, )
-	if (HasAuthority)
+	// MC_SendStateToClients(CurrentState, )
+	if (HasAuthority())
 	{
+		for (auto& Pair : InputBuffers)
+		{
+			AActor* Actor = Pair.Key;
+			TMpscQueue<FBulletPlayerInput>& Queue = *Pair.Value;
 
-		// TODO: replace TCircularBuffer with TMPSCQueue
+			if (Queue.IsEmpty())
+			{ // empty, do nothing
+				GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Green, TEXT("0"));
+			} else
+			{ // apply input
+				auto optional = Queue.Dequeue();
+				auto input = optional.GetValue();
+				auto pawn = Cast<ABasicPhysicsPawn>(Actor);
+				pawn->ApplyInputs(input);
+				if (Queue.IsEmpty())
+				{ // apply second input if  available
+					auto optional2 = Queue.Dequeue();
+					auto input2 = optional.GetValue();
+					pawn->ApplyInputs(input2);
+				}
+			}
+			
+			
+		}
 		
 		// // consume input from each actor
 		// for (auto& Pair : InputBuffers)
@@ -109,22 +133,11 @@ void ATestActor::SendInputToServer(AActor* actor, FBulletPlayerInput input)
 	// If this actor doesn't have an input buffer yet, create one
 	if (!InputBuffers.Contains(actor))
 	{
-		TCircularBuffer<FBulletPlayerInput> NewBuffer(32);
-		InputBuffers.Add(actor, NewBuffer);
-		InputIndices.Add(actor, 0);  // Start at index 0
+		InputBuffers.Add(actor, MakeUnique<TMpscQueue<FBulletPlayerInput>>());
 	}
-    
-	// Get reference to the buffer and the current index
-	TCircularBuffer<FBulletPlayerInput>& Buffer = InputBuffers[actor];
-	uint32& CurrentIndex = InputIndices[actor];
-    
-	// Write the input at the current index
-	Buffer[CurrentIndex] = input;
-    
-	// Update to the next index using the buffer's method
-	CurrentIndex = Buffer.GetNextIndex(CurrentIndex);
-
-	GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Yellow, FString::Printf(TEXT("Server: total inputs in buffer: %i"), SumMyInputBuffers()));
+	InputBuffers[actor]->Enqueue(input);
+	
+	// GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Yellow, FString::Printf(TEXT("Server: total inputs in buffer: %i"), SumMyInputBuffers()));
 }
 
 void ATestActor::MC_SendStateToClients_Implementation(FBulletSimulationState State, const TArray<AActor*>& InputActors,

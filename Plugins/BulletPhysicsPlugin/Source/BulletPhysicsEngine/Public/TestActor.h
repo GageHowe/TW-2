@@ -44,10 +44,7 @@ public:
 	TMap<AActor*, btRigidBody*> ActorToBody;
 	
 	// server's list of input Cbuffers for each pawn
-	TMap<AActor*, TCircularBuffer<FBulletPlayerInput>> InputBuffers;
-	// a member variable to track the current CBuffer index for each actor
-	TMap<AActor*, uint32> InputIndices;
-	
+	TMap<AActor*, TUniquePtr<TMpscQueue<FBulletPlayerInput>>> InputBuffers;
 	virtual void GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const override;
 
 	UFUNCTION()
@@ -59,7 +56,8 @@ public:
 		int TotalEntries = 0;
 		for (const auto& Pair : InputBuffers)
 		{
-			TotalEntries += Pair.Value.Capacity();
+			// TotalEntries += Pair.Value.Capacity();
+			TotalEntries += 0;
 		}
 		return TotalEntries;
 	}
