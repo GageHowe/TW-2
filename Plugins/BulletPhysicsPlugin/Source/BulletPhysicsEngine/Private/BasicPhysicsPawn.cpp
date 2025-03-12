@@ -57,7 +57,7 @@ void ABasicPhysicsPawn::Tick(float DeltaTime)
 		ApplyInputs(input);
 
 		// send inputs to server
-		// FNetworkGUID id = BulletWorld->GetNetGUIDFromActor(this);
+		FNetworkGUID id = BulletWorld->GetNetGUIDFromActor(this);
 		// BulletWorld->SR_SendInputsByID(id.ObjectId, input);
 	} else if (HasAuthority())
 	{
@@ -65,27 +65,16 @@ void ABasicPhysicsPawn::Tick(float DeltaTime)
 		// printf("slkdf");
 	}
 
+	// FObjectKey
+
 	// debug stuff
 	if (testdebug)
 	{
 		if (IsLocallyControlled())
 		{
 			auto id = BulletWorld->GetNetGUIDFromActor(this).ObjectId;
-			GEngine->AddOnScreenDebugMessage(-1, 0.5f, FColor::Yellow, FString::Printf(TEXT("Client: ID: %llu"), id));
-			SR_PrintID();
+			GEngine->AddOnScreenDebugMessage(-1, 0.5f, FColor::Yellow, FString::Printf(TEXT("ID: %llu"), id));
 		}
-
-
-	}
-	if (HasAuthority() && BulletWorld)
-	{
-		auto id = BulletWorld->GetNetGUIDFromActor(this).ObjectId;
-		GEngine->AddOnScreenDebugMessage(-1, 0.5f, FColor::Blue, FString::Printf(TEXT("Server: ID: %llu"), id));
-	}
-	else if (HasAuthority())
-	{
-		GEngine->AddOnScreenDebugMessage(-1, 0.5f, FColor::Red, TEXT("BulletWorld is null on server"));
-	}
 }
 
 // right now, this just accelerates the pawn, but that's fine for now
@@ -121,42 +110,3 @@ void ABasicPhysicsPawn::EnableDebug()
 	testdebug = true;
 }
 
-void ABasicPhysicsPawn::SR_PrintID_Implementation()
-{
-	GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Green, TEXT("SR_PrintID - Executing on SERVER"));
-    
-	// Check if BulletWorld is valid
-	if (BulletWorld)
-	{
-		GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Green, TEXT("BulletWorld is valid on server"));
-	}
-	else
-	{
-		GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Red, TEXT("BulletWorld is NULL on server"));
-		return;
-	}
-    
-	// Try to get the NetGUID, with more debug info
-	FNetworkGUID netGUID;
-	try
-	{
-		netGUID = BulletWorld->GetNetGUIDFromActor(this);
-		GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Green, TEXT("Got NetGUID successfully"));
-	}
-	catch(...)
-	{
-		GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Red, TEXT("Exception when calling GetNetGUIDFromActor"));
-		return;
-	}
-    
-	// If we got here, try to get the ObjectId
-	try
-	{
-		uint64 id = netGUID.ObjectId;
-		GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Blue, FString::Printf(TEXT("Server: ID: %llu"), id));
-	}
-	catch(...)
-	{
-		GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Red, TEXT("Exception when accessing ObjectId"));
-	}
-}

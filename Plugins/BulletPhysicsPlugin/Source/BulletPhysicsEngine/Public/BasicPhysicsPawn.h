@@ -40,11 +40,7 @@ public:
 
 	void ApplyInputs(const FBulletPlayerInput& input) const;
 	void EnableDebug();
-
-	UFUNCTION(Server, Reliable)
-	void SR_PrintID();
-
-	UPROPERTY(Replicated)
+	
 	bool testdebug = false;
 private:
 	UPROPERTY(EditDefaultsOnly)

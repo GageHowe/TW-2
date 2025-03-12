@@ -11,6 +11,7 @@ ATestActor::ATestActor()
 {
 	PrimaryActorTick.bCanEverTick = true;
 	// BtDebugDraw = new BulletDebugDraw(GetWorld(), GetActorLocation());
+	bReplicates = true;
 }
 
 // Called when the game starts or when spawned
@@ -139,21 +140,25 @@ void ATestActor::UpdateProcBody(AActor* Body, float Friction, TArray<FVector> a,
 	ID = BtWorld->getNumCollisionObjects() - 1;
 }
 
-void ATestActor::AddRigidBody(AActor* Body, float Friction, float Restitution, float mass)
+void ATestActor::AddRigidBody(AActor* actor, float Friction, float Restitution, float mass)
 {
 	btRigidBody* rb = AddRigidBody(Body, GetCachedDynamicShapeData(Body, mass), Friction, Restitution);
-	auto guid = GetNetGUIDFromActor(Body);
-	BodyToGUID.Add(rb, guid); // not tested yet
-	GUIDToBody.Add(guid, rb);
+	// auto guid = GetNetGUIDFromActor(Body);
+	// BodyToGUID.Add(rb, guid); // not tested yet
+	// GUIDToBody.Add(guid, rb);
+	BodyToActor.Add(rb, actor);
+	ActorToBody.Add(actor, rb);
 	// add input buffer?
 }
 
 btRigidBody* ATestActor::AddRigidBodyAndReturn(AActor* Body, float Friction, float Restitution, float mass)
 {
 	btRigidBody* rb = AddRigidBody(Body, GetCachedDynamicShapeData(Body, mass), Friction, Restitution);
-	auto guid = GetNetGUIDFromActor(Body);
-	BodyToGUID.Add(rb, guid); // not tested yet
-	GUIDToBody.Add(guid, rb);
+	// auto guid = GetNetGUIDFromActor(Body);
+	// BodyToGUID.Add(rb, guid); // not tested yet
+	// GUIDToBody.Add(guid, rb);
+	BodyToActor.Add(rb, Body);
+	ActorToBody.Add(Body, rb);
 	// add input buffer?
 	return rb;
 }
