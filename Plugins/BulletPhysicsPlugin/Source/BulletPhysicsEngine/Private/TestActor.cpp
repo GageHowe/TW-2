@@ -65,6 +65,33 @@ void ATestActor::Tick(float DeltaTime)
 	randvar = mt->getRandSeed();
 	// CurrentState = GetCurrentState();
 	// MC_SendStateToClients(CurrentState, )
+	if (HasAuthority)
+	{
+
+		// TODO: replace TCircularBuffer with TMPSCQueue
+		
+		// // consume input from each actor
+		// for (auto& Pair : InputBuffers)
+		// {
+		// 	AActor* Actor = Pair.Key;
+		// 	TCircularBuffer<FBulletPlayerInput>& Buffer = Pair.Value;
+		// 	uint32& CurrentIndex = InputIndices[Actor];
+  //   
+		// 	int32 InputsToConsume = Buffer.Num(); // Get number of available inputs
+		// 	if (InputsToConsume > 1) {
+		// 		// Consume 2 inputs if more than one available
+		// 		ProcessInput(Actor, Buffer[CurrentIndex]);
+		// 		CurrentIndex = Buffer.GetNextIndex(CurrentIndex);
+		// 		ProcessInput(Actor, Buffer[CurrentIndex]);
+		// 		CurrentIndex = Buffer.GetNextIndex(CurrentIndex);
+		// 	} else if (InputsToConsume == 1) {
+		// 		// Consume the single available input
+		// 		ProcessInput(Actor, Buffer[CurrentIndex]);
+		// 		CurrentIndex = Buffer.GetNextIndex(CurrentIndex);
+		// 	}
+		// 	// If no inputs (InputsToConsume == 0), consume none
+		// }
+	}
 }
 
 void ATestActor::SR_test_Implementation()
