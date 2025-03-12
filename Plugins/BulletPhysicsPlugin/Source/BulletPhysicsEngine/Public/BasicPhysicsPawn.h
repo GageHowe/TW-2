@@ -38,7 +38,9 @@ public:
 
 	void ApplyInputs(const FBulletPlayerInput& input) const;
 	// void EnableDebug();
-	//
+
+	UFUNCTION(Server, Reliable)
+	void ServerTest();
 private:
 	UPROPERTY(EditDefaultsOnly)
 	UStaticMeshComponent* StaticMesh;
@@ -54,3 +56,4 @@ protected:
 	void SetRightInput(float Value) { DirectionalInput.Y = Value; }
 	void SetUpInput(float Value) { DirectionalInput.Z = Value; }
 };
+

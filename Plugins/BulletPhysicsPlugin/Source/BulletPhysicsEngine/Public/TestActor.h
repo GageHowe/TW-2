@@ -45,6 +45,8 @@ public:
 	
 	// server's list of input Cbuffers for each pawn
 	TMap<AActor*, TCircularBuffer<FBulletPlayerInput>> InputBuffers;
+
+	virtual void GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const override;
 	
 	// Global objects
 	btCollisionConfiguration* BtCollisionConfig;
@@ -107,7 +109,12 @@ public:
 
 	UFUNCTION(BlueprintCallable, Server, Reliable)
 	void SR_SendInputsByID(AActor* actor, FBulletPlayerInput input);
-	
+
+	UFUNCTION(BlueprintCallable, Server, Reliable)
+	void SR_test();
+
+	UFUNCTION()
+	void test2();
 
 	// use this to completely remove the body and references to it
 	// E.g. when destroying an actor

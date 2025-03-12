@@ -7,13 +7,16 @@
 ABasicPhysicsPawn::ABasicPhysicsPawn()
 {
 	PrimaryActorTick.bCanEverTick = true;
+	bReplicates = true;
+	SetReplicatingMovement(false);
+	
 	StaticMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("PlayerMesh"));
 	RootComponent = StaticMesh;
 	Camera = CreateDefaultSubobject<UCameraComponent>(TEXT("PlayerCamera"));
 	Camera->SetupAttachment(StaticMesh);
 	SpawnCollisionHandlingMethod = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
-	SetReplicatingMovement(false);
-	SetReplicates(true);
+
+	// SetReplicates(true);
 }
 
 void ABasicPhysicsPawn::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -57,15 +60,13 @@ void ABasicPhysicsPawn::Tick(float DeltaTime)
 		ApplyInputs(input);
 
 		// send inputs to server
-		BulletWorld->SR_SendInputsByID(this, input);
+		ServerTest();
+		// BulletWorld->SR_SendInputsByID(this, input);
+		GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Green, TEXT("Trying to send rpc"));
 	} else if (HasAuthority())
 	{
-		// BulletWorld->SendInputsToServer
-		// printf("slkdf");
-	}
 
-	// FObjectKey
-	
+	}
 }
 
 // right now, this just accelerates the pawn, but that's fine for now
@@ -76,6 +77,28 @@ void ABasicPhysicsPawn::ApplyInputs(const FBulletPlayerInput& input) const
 	if (!MyRigidBody) { GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Red, TEXT("WARNING RigidBody ptr is null 2")); return; }
 	MyRigidBody->applyForce(forceVector, btVector3(0, 0, 0));
 }
+
+void ABasicPhysicsPawn::ServerTest_Implementation()
+{
+	if (!HasAuthority())
+	{
+		GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Yellow, TEXT("Not running on authority!"));
+		return;
+	}
+
+	GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Red, TEXT("server rpc in pawn worked!"));
+    
+	if (BulletWorld)
+	{
+		BulletWorld->test2();
+	}
+	else
+	{
+		GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Red, TEXT("BulletWorld is null!"));
+	}
+	
+}
+
 
 void ABasicPhysicsPawn::PossessedBy(AController* NewController)
 {

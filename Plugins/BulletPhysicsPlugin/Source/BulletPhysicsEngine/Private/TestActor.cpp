@@ -3,6 +3,7 @@
 
 #include "TestActor.h"
 
+#include "LevelInstance/LevelInstanceTypes.h"
 #include "Types/AttributeStorage.h"
 
 
@@ -10,8 +11,10 @@
 ATestActor::ATestActor()
 {
 	PrimaryActorTick.bCanEverTick = true;
-	// BtDebugDraw = new BulletDebugDraw(GetWorld(), GetActorLocation());
+	// SetReplicates(true);
 	bReplicates = true;
+	bAlwaysRelevant = true;
+	bOnlyRelevantToOwner = false;
 }
 
 // Called when the game starts or when spawned
@@ -60,12 +63,28 @@ void ATestActor::Tick(float DeltaTime)
 
 	CurrentFrameNumber++; // increment local frame number
 	randvar = mt->getRandSeed();
+	
+}
+
+void ATestActor::SR_test_Implementation()
+{
+	if (HasAuthority())
+	{
+		GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::White, TEXT("test worked"));
+		// CallRemoteFunction()
+	}
 }
 
 void ATestActor::SR_SendInputsByID_Implementation(AActor* actor, FBulletPlayerInput input)
 {
+	GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Green, TEXT("sent rpc"));
 	GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Blue, TEXT("Received an input from a client"));
 	// todo: add the input to the corresponding buffer
+}
+
+void ATestActor::test2()
+{
+	GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Green, TEXT("sent rpc worked!"));
 }
 
 
@@ -85,13 +104,10 @@ void ATestActor::SR_SendInputsByID_Implementation(AActor* actor, FBulletPlayerIn
 
 
 
-
-
-
-
-
-
-
+void ATestActor::GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+}
 
 void ATestActor::SetupStaticGeometryPhysics(TArray<AActor*> Actors, float Friction, float Restitution)
 {
