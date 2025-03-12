@@ -23,6 +23,7 @@ void ABasicPhysicsPawn::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Ou
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	// DOREPLIFETIME(ABasicPhysicsPawn, testdebug);
+	DOREPLIFETIME(ABasicPhysicsPawn, IsPossessed);
 }
 
 void ABasicPhysicsPawn::BeginPlay()
@@ -38,14 +39,20 @@ void ABasicPhysicsPawn::BeginPlay()
 	if (!rb) { GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Red, TEXT("WARNING RigidBody ptr is null")); }
 	MyRigidBody = rb;
 
-	if (GetLocalRole() == ROLE_Authority)
-	{
-		GEngine->AddOnScreenDebugMessage(-1, 20.0f, FColor::Green, TEXT("I am the SERVER"));
-	}
-	else
-	{
-		GEngine->AddOnScreenDebugMessage(-1, 20.0f, FColor::Red, TEXT("I am a CLIENT"));
-	}
+	// if (GetLocalRole() == ROLE_Authority)
+	// {
+	// 	GEngine->AddOnScreenDebugMessage(-1, 20.0f, FColor::Green, TEXT("I am the SERVER"));
+	// }
+	// else
+	// {
+	// 	GEngine->AddOnScreenDebugMessage(-1, 20.0f, FColor::Red, TEXT("I am a CLIENT"));
+	// }
+
+	bReplicates = true;
+	SetOwner(GetController());
+	
+	GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Yellow, 
+	FString::Printf(TEXT("Network Role: %d"), GetLocalRole()));
 }
 
 void ABasicPhysicsPawn::Tick(float DeltaTime)
@@ -58,11 +65,7 @@ void ABasicPhysicsPawn::Tick(float DeltaTime)
 		FBulletPlayerInput input = FBulletPlayerInput();
 		input.MovementInput = DirectionalInput;
 		ApplyInputs(input);
-
-		// send inputs to server
-		ServerTest();
-		// BulletWorld->SR_SendInputsByID(this, input);
-		GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Green, TEXT("Trying to send rpc"));
+		
 	} else if (HasAuthority())
 	{
 
@@ -80,14 +83,9 @@ void ABasicPhysicsPawn::ApplyInputs(const FBulletPlayerInput& input) const
 
 void ABasicPhysicsPawn::ServerTest_Implementation()
 {
-	if (!HasAuthority())
-	{
-		GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Yellow, TEXT("Not running on authority!"));
-		return;
-	}
-
 	GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Red, TEXT("server rpc in pawn worked!"));
     
+	IsPossessed = false;
 	if (BulletWorld)
 	{
 		BulletWorld->test2();
@@ -96,17 +94,29 @@ void ABasicPhysicsPawn::ServerTest_Implementation()
 	{
 		GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Red, TEXT("BulletWorld is null!"));
 	}
-	
 }
 
+// In your implementation file (.cpp)
+bool ABasicPhysicsPawn::ServerTest_Validate()
+{
+	GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Yellow, TEXT("RPC Validation"));
+	return true;
+}
+
+void ABasicPhysicsPawn::ServerTestSimple_Implementation()
+{
+	GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Green, TEXT("Simple RPC worked!"));
+}
 
 void ABasicPhysicsPawn::PossessedBy(AController* NewController)
 {
+	Super::PossessedBy(NewController);
 	IsPossessed = true;
 }
 
 void ABasicPhysicsPawn::UnPossessed()
 {
+	Super::UnPossessed();
 	IsPossessed = false;
 }
 
@@ -116,11 +126,28 @@ void ABasicPhysicsPawn::SetupPlayerInputComponent(class UInputComponent* ThisInp
 	InputComponent->BindAxis(TEXT("MoveForward"), this, &ABasicPhysicsPawn::SetForwardInput);
 	InputComponent->BindAxis(TEXT("MoveRight"), this, &ABasicPhysicsPawn::SetRightInput);
 	InputComponent->BindAxis(TEXT("MoveUp"), this, &ABasicPhysicsPawn::SetUpInput);
-	// InputComponent->BindAction(TEXT("Interact"), IE_Pressed, this, &ABasicPhysicsPawn::EnableDebug);
+	InputComponent->BindAction(TEXT("Interact"), IE_Pressed, this, &ABasicPhysicsPawn::EnableDebug);
 }
 
-// void ABasicPhysicsPawn::EnableDebug()
-// {
-// 	testdebug = true;
-// }
-//
+void ABasicPhysicsPawn::EnableDebug()
+{
+	// testdebug = true;
+	GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Yellow, FString::Printf(TEXT("bReplicates: %hhu"), bReplicates));
+	GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Red, TEXT("trying to call rpc"));
+	
+	// Check controller status
+	if (GetController())
+	{
+		GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Yellow, 
+			FString::Printf(TEXT("Controller: %s"), *GetController()->GetName()));
+	}
+	else
+	{
+		GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Yellow, TEXT("No Controller!"));
+	}
+    
+	ServerTestSimple();
+	ServerTest();
+}
+
+

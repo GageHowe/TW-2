@@ -33,14 +33,17 @@ public:
 	
 	// this is marked false when the pawn should not send or receive input
 	// i.e. an inactive vehicle or dead player
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	bool IsPossessed = true; // fix this to only be true when possessed
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Replicated)
+	bool IsPossessed = true;
 
+	UFUNCTION()
 	void ApplyInputs(const FBulletPlayerInput& input) const;
-	// void EnableDebug();
+	void EnableDebug();
 
-	UFUNCTION(Server, Reliable)
+	UFUNCTION(Server, Reliable, WithValidation)
 	void ServerTest();
+	UFUNCTION(Server, Reliable)
+	void ServerTestSimple();
 private:
 	UPROPERTY(EditDefaultsOnly)
 	UStaticMeshComponent* StaticMesh;
