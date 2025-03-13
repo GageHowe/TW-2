@@ -88,9 +88,16 @@ public:
 	// void MC_SendStateToClients(FBulletSimulationState state, TArray<TPair<AActor*, FBulletPlayerInput>> inputs);
 	void MC_SendStateToClients(FBulletSimulationState State, const TArray<AActor*>& InputActors, const TArray<FBulletPlayerInput>& PlayerInputs);
 
-	void Resim()
+	// sets the state of the physics world, called by
+	// BasicPhysicsPawn.resim()
+	// only used on the client
+	void SetState(FBulletSimulationState state)
 	{
-		
+		if (!HasAuthority())
+		{
+			// set to state
+			return;
+		}
 	}
 	// Global objects
 	btCollisionConfiguration* BtCollisionConfig;

@@ -35,19 +35,13 @@ void ABasicPhysicsPawn::BeginPlay()
 	world = Cast<ATestActor>(worlds[0]); // this will crash if no world is present
 										// if you ain't crashed, the reference is valid
 	BulletWorld = world;
-	btRigidBody* rb = world->AddRigidBodyAndReturn(this, 0.2, 0.2, 1);
-	if (!rb) { GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Red, TEXT("WARNING RigidBody ptr is null")); }
-	MyRigidBody = rb;
-
-	bReplicates = true;
-	SetOwner(GetController()); // are these necessary?
-
+	MyRigidBody = world->AddRigidBodyAndReturn(this, 0.2, 0.2, 1);
+	if (!MyRigidBody) { GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Red, TEXT("WARNING RigidBody ptr is null")); }
 }
 
 void ABasicPhysicsPawn::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
-
 	if (IsLocallyControlled())
 	{
 		FBulletPlayerInput input = FBulletPlayerInput();
@@ -55,12 +49,17 @@ void ABasicPhysicsPawn::Tick(float DeltaTime)
 		ApplyInputs(input);
 		SendInputsToServer(this, input);
 	}
+
+	// world timer stuff
+	// double x = GetWorld()->GetGameState()->GetServerWorldTimeSeconds();
+	// GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Yellow, 
+	// FString::Printf(TEXT("time: %f"), x));
 }
 
 // right now, this just accelerates the pawn, but that's fine for now
 void ABasicPhysicsPawn::ApplyInputs(const FBulletPlayerInput& input) const
 {
-	// GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Green, TEXT("Applying inputs"));
+	GEngine->AddOnScreenDebugMessage(3, 5.0f, FColor::Green, TEXT("Applying inputs"));
 	btVector3 forceVector = BulletHelpers::ToBtDir(input.MovementInput, true) * 10000.0f;
 	if (!MyRigidBody) { GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Red, TEXT("WARNING RigidBody ptr is null 2")); return; }
 	MyRigidBody->applyForce(forceVector, btVector3(0, 0, 0));

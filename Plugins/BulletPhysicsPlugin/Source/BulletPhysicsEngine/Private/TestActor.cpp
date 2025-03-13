@@ -70,20 +70,20 @@ void ATestActor::Tick(float DeltaTime)
 			TMpscQueue<FBulletPlayerInput>& Queue = *Pair.Value;
 			if (Queue.IsEmpty())
 			{ // empty, do nothing
-				GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Blue, TEXT("packet dropped, 0"));
+			//	GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Blue, TEXT("packet dropped, 0"));
 			} else
 			{ // apply input
 				auto optional = Queue.Dequeue();
 				auto input = optional.GetValue();
 				auto pawn = Cast<ABasicPhysicsPawn>(Actor);
 				pawn->ApplyInputs(input);
-				GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Blue, TEXT("dequeued input, 1"));
+				// GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Blue, TEXT("dequeued input, 1"));
 				if (Queue.IsEmpty())
 				{ // apply second input if  available
 					auto optional2 = Queue.Dequeue();
 					auto input2 = optional.GetValue();
 					pawn->ApplyInputs(input2);
-					GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Blue, TEXT("dequeued extra input, 2"));
+				//	GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Blue, TEXT("dequeued extra input, 2"));
 				}
 			}
 		}

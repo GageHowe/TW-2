@@ -52,7 +52,20 @@ public:
 	UFUNCTION(Server, Unreliable)
 	void SendInputsToServer(AActor* actor, FBulletPlayerInput input);
 
-
+	void resim(FBulletSimulationState state)
+	{
+		// auto time = state.FrameNumber;
+		// auto x = AGameStateBase::GetServerWorldTimeSeconds;
+		// // for (???)
+		// // {
+		// // 	this->ApplyInputs(LocalInputBuffer[???]);
+		// // 	everythingelse->ApplyInputs(MostRecentInput);
+		// // 	BulletWorld->StepPhysics((1.0f/60.0f), 0);
+		// // }
+		// FBulletSimulationState newState = state;
+		// BulletWorld->SetState(newState);
+	}
+	
 	// Simple helper methods
 	void AddHistoryEntry(const FBulletSimulationState& Entry)
 	{
