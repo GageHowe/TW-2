@@ -3,6 +3,7 @@
 #include "TestActor.h"
 #include "Net/UnrealNetwork.h"
 #include "Kismet/GameplayStatics.h"
+#include "TWPlayerController.h"
 
 ABasicPhysicsPawn::ABasicPhysicsPawn() : StateHistoryBuffer(128)
 {
@@ -125,8 +126,14 @@ void ABasicPhysicsPawn::EnableDebug()
 		GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Yellow, TEXT("No Controller!"));
 	}
     
-	ServerTestSimple();
-	ServerTest();
+	// ServerTestSimple();
+	// ServerTest();
+
+	if (auto pc = Cast<ATWPlayerController>(GetController()))
+	{
+		GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Yellow, TEXT("Correct Player Controller Found"));
+		pc->SyncTimeWithServer();
+	}
 }
 
 void ABasicPhysicsPawn::SendInputsToServer_Implementation(AActor* actor, FBulletPlayerInput input)

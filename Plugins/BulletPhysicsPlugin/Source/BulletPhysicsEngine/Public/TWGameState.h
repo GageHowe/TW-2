@@ -3,14 +3,14 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "GameFramework/PlayerController.h"
-#include "TWPlayerController.generated.h"
+#include "GameFramework/GameState.h"
+#include "TWGameState.generated.h"
 
 /**
  * 
  */
 UCLASS()
-class TWBULLET_API ATWPlayerController : public APlayerController
+class BULLETPHYSICSENGINE_API ATWGameState : public AGameState
 {
 	GENERATED_BODY()
 	
