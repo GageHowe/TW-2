@@ -60,8 +60,10 @@ USTRUCT(BlueprintType) // A FBulletSimulationState is an array of all object sta
 struct FBulletSimulationState
 {
 	GENERATED_BODY()
-	TArray<FBulletObjectState> ObjectStates;
-	int32 FrameNumber;
+	UPROPERTY()
+	TArray<FBulletObjectState> ObjectStates = TArray<FBulletObjectState>();
+	UPROPERTY()
+	int32 FrameNumber = 0;
 };
 
 /**
@@ -110,3 +112,4 @@ static TMap<KeyType, ValueType> ArraysToMap(const TArray<KeyType>& InKeys, const
         
 	return Result;
 }
+

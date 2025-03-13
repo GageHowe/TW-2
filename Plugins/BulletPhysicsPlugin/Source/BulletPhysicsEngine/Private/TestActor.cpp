@@ -59,77 +59,49 @@ void ATestActor::BeginPlay()
 void ATestActor::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
-	
 	StepPhysics(DeltaTime, 0);
-
-	CurrentFrameNumber++; // increment local frame number
 	randvar = mt->getRandSeed();
-	// CurrentState = GetCurrentState();
-	// MC_SendStateToClients(CurrentState, )
-	// MC_SendStateToClients(CurrentState, )
 	if (HasAuthority())
 	{
+		// consume input
 		for (auto& Pair : InputBuffers)
 		{
 			AActor* Actor = Pair.Key;
 			TMpscQueue<FBulletPlayerInput>& Queue = *Pair.Value;
-
 			if (Queue.IsEmpty())
 			{ // empty, do nothing
-				GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Green, TEXT("0"));
+				GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Blue, TEXT("packet dropped, 0"));
 			} else
 			{ // apply input
 				auto optional = Queue.Dequeue();
 				auto input = optional.GetValue();
 				auto pawn = Cast<ABasicPhysicsPawn>(Actor);
 				pawn->ApplyInputs(input);
+				GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Blue, TEXT("dequeued input, 1"));
 				if (Queue.IsEmpty())
 				{ // apply second input if  available
 					auto optional2 = Queue.Dequeue();
 					auto input2 = optional.GetValue();
 					pawn->ApplyInputs(input2);
+					GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Blue, TEXT("dequeued extra input, 2"));
 				}
 			}
-			
-			
 		}
-		
-		// // consume input from each actor
-		// for (auto& Pair : InputBuffers)
-		// {
-		// 	AActor* Actor = Pair.Key;
-		// 	TCircularBuffer<FBulletPlayerInput>& Buffer = Pair.Value;
-		// 	uint32& CurrentIndex = InputIndices[Actor];
-  //   
-		// 	int32 InputsToConsume = Buffer.Num(); // Get number of available inputs
-		// 	if (InputsToConsume > 1) {
-		// 		// Consume 2 inputs if more than one available
-		// 		ProcessInput(Actor, Buffer[CurrentIndex]);
-		// 		CurrentIndex = Buffer.GetNextIndex(CurrentIndex);
-		// 		ProcessInput(Actor, Buffer[CurrentIndex]);
-		// 		CurrentIndex = Buffer.GetNextIndex(CurrentIndex);
-		// 	} else if (InputsToConsume == 1) {
-		// 		// Consume the single available input
-		// 		ProcessInput(Actor, Buffer[CurrentIndex]);
-		// 		CurrentIndex = Buffer.GetNextIndex(CurrentIndex);
-		// 	}
-		// 	// If no inputs (InputsToConsume == 0), consume none
-		// }
+		// send state
+		CurrentState = GetCurrentState();
+		// MC_SendStateToClients(CurrentState, );
 	}
+	CurrentFrameNumber++;
 }
 
 void ATestActor::SR_test_Implementation()
 {
-	if (HasAuthority())
-	{
-		GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::White, TEXT("test worked"));
-		// CallRemoteFunction()
-	}
+	if (HasAuthority()) { GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::White, TEXT("test worked")); }
 }
 
 void ATestActor::SendInputToServer(AActor* actor, FBulletPlayerInput input)
 {
-	GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Yellow, FString::Printf(TEXT("recieved: %i"), true));
+	// GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Yellow, FString::Printf(TEXT("recieved: %i"), true));
 	// If this actor doesn't have an input buffer yet, create one
 	if (!InputBuffers.Contains(actor))
 	{
@@ -156,8 +128,11 @@ void ATestActor::MC_SendStateToClients_Implementation(FBulletSimulationState Sta
 			}
 		}
 		
-		// TODO APPLY INPUTS
-		// TODO RESIMULATE IF NECESSARY
+		// TODO RESIMULATE
+		// Run simulate with delta time and apply inputs
+		// for other clients, apply last known input every frame. Or don't? This will cause noticeable desyncs if too long before a resim
+		// for self, apply last buffer of inputs up to now
+		// The player should notice no change if previously predicted right
 		
 		// // Process the state and inputs
 		// ProcessSimulationUpdate(State, LastActorInputs);
@@ -169,6 +144,10 @@ void ATestActor::test2()
 {
 	GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Green, TEXT("sent rpc worked!"));
 }
+
+
+
+
 
 
 

@@ -4,7 +4,7 @@
 #include "Net/UnrealNetwork.h"
 #include "Kismet/GameplayStatics.h"
 
-ABasicPhysicsPawn::ABasicPhysicsPawn()
+ABasicPhysicsPawn::ABasicPhysicsPawn() : StateHistoryBuffer(128)
 {
 	PrimaryActorTick.bCanEverTick = true;
 	bReplicates = true;
@@ -39,20 +39,9 @@ void ABasicPhysicsPawn::BeginPlay()
 	if (!rb) { GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Red, TEXT("WARNING RigidBody ptr is null")); }
 	MyRigidBody = rb;
 
-	// if (GetLocalRole() == ROLE_Authority)
-	// {
-	// 	GEngine->AddOnScreenDebugMessage(-1, 20.0f, FColor::Green, TEXT("I am the SERVER"));
-	// }
-	// else
-	// {
-	// 	GEngine->AddOnScreenDebugMessage(-1, 20.0f, FColor::Red, TEXT("I am a CLIENT"));
-	// }
-
 	bReplicates = true;
-	SetOwner(GetController());
-	
-	GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Yellow, 
-	FString::Printf(TEXT("Network Role: %d"), GetLocalRole()));
+	SetOwner(GetController()); // are these necessary?
+
 }
 
 void ABasicPhysicsPawn::Tick(float DeltaTime)

@@ -88,6 +88,10 @@ public:
 	// void MC_SendStateToClients(FBulletSimulationState state, TArray<TPair<AActor*, FBulletPlayerInput>> inputs);
 	void MC_SendStateToClients(FBulletSimulationState State, const TArray<AActor*>& InputActors, const TArray<FBulletPlayerInput>& PlayerInputs);
 
+	void Resim()
+	{
+		
+	}
 	// Global objects
 	btCollisionConfiguration* BtCollisionConfig;
 	btCollisionDispatcher* BtCollisionDispatcher;
