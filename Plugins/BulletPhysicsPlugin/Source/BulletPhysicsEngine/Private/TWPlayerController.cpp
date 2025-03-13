@@ -4,6 +4,21 @@
 
 #include "TWPlayerController.h"
 
+
+void ATWPlayerController::BeginPlay()
+{
+	Super::BeginPlay();
+	SetupTimeSyncTimer();
+}
+
+void ATWPlayerController::SetupTimeSyncTimer()
+{
+	if (!HasAuthority())
+	{
+		GetWorldTimerManager().SetTimer(TimeSyncTimerHandle, this, &ATWPlayerController::SyncTimeWithServer, 1.0f, true);
+	}
+}
+
 void ATWPlayerController::SyncTimeWithServer()
 {
 	if (!HasAuthority())
@@ -33,9 +48,9 @@ void ATWPlayerController::CL_UpdateTime_Implementation(double serverTime, double
 
 	// logging
 	
-	// GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Green, 
-	// FString::Printf(TEXT("RoundTrip: %f, Half: %f, clock set to: %f, was %f"), 
-	// RoundTripDelay, TimeOffset, GetWorld()->TimeSeconds, lastTime));
-	// UE_LOG(LogTemp, Warning, TEXT("RoundTrip: %f, Half: %f, clock set to: %f, was %f"), 
-	// RoundTripDelay, TimeOffset, GetWorld()->TimeSeconds, lastTime);
+	GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Green, 
+	FString::Printf(TEXT("RoundTrip: %f, Half: %f, clock set to: %f, was %f"), 
+	RoundTripDelay, TimeOffset, GetWorld()->TimeSeconds, lastTime));
+	UE_LOG(LogTemp, Warning, TEXT("RoundTrip: %f, Half: %f, clock set to: %f, was %f"), 
+	RoundTripDelay, TimeOffset, GetWorld()->TimeSeconds, lastTime);
 }

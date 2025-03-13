@@ -14,12 +14,16 @@ class BULLETPHYSICSENGINE_API ATWPlayerController : public APlayerController
 {
 	GENERATED_BODY()
 public:
+
+	virtual void BeginPlay() override;
+	
 	UPROPERTY()
 	double TimeOffset = 0;
-    
-	// Round-trip delay (in milliseconds)
 	UPROPERTY()
 	double RoundTripDelay = 0;
+
+	FTimerHandle TimeSyncTimerHandle;
+	void SetupTimeSyncTimer();
 
 	ATWPlayerController() // default constructor if needed
 	{

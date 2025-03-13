@@ -5,7 +5,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "TWPlayerController.h"
 
-ABasicPhysicsPawn::ABasicPhysicsPawn() : StateHistoryBuffer(128)
+ABasicPhysicsPawn::ABasicPhysicsPawn()
 {
 	PrimaryActorTick.bCanEverTick = true;
 	bReplicates = true;

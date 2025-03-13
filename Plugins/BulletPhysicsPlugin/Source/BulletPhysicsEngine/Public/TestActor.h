@@ -50,6 +50,40 @@ public:
 	UFUNCTION()
 	void SendInputToServer(AActor* actor, FBulletPlayerInput input);
 
+	
+
+	TCircularBuffer<FBulletSimulationState> StateHistoryBuffer = TCircularBuffer<FBulletSimulationState>(128);
+	uint32 CurrentHistoryIndex = 0;
+	uint32 HistoryCount = 0;
+	
+	// Simple helper methods
+	void AddHistoryEntry(const FBulletSimulationState& Entry)
+	{
+		StateHistoryBuffer[CurrentHistoryIndex] = Entry;
+		CurrentHistoryIndex = StateHistoryBuffer.GetNextIndex(CurrentHistoryIndex);
+		HistoryCount = FMath::Min(HistoryCount + 1, (uint32)StateHistoryBuffer.Capacity());
+	}
+
+	const FBulletSimulationState* FindHistoryEntryByFrame(int32 FrameNumber) const
+	{
+		if (HistoryCount == 0) return nullptr;
+    
+		uint32 Index = CurrentHistoryIndex;
+		for (uint32 i = 0; i < HistoryCount; ++i)
+		{
+			Index = StateHistoryBuffer.GetPreviousIndex(Index);
+			if (StateHistoryBuffer[Index].FrameNumber == FrameNumber)
+				return &StateHistoryBuffer[Index];
+		}
+		return nullptr;
+	}
+	const FBulletSimulationState* GetLatestHistoryEntry() const
+	{
+		if (HistoryCount == 0)
+			return nullptr;
+		return &StateHistoryBuffer[StateHistoryBuffer.GetPreviousIndex(CurrentHistoryIndex)];
+	}
+
 	UFUNCTION(BlueprintCallable)
 	int SumMyInputBuffers() const
 	{

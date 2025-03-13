@@ -30,10 +30,6 @@ public:
 	
 	UPROPERTY(EditAnywhere)
 	ATestActor* BulletWorld = nullptr;
-
-	TCircularBuffer<FBulletSimulationState> StateHistoryBuffer = TCircularBuffer<FBulletSimulationState>(128);
-	uint32 CurrentHistoryIndex = 0;
-	uint32 HistoryCount = 0;
 	
 	// this is marked false when the pawn should not send or receive input
 	// i.e. an inactive vehicle or dead player
@@ -64,55 +60,6 @@ public:
 		// BulletWorld->SetState(newState);
 	}
 	
-	// Simple helper methods
-	void AddHistoryEntry(const FBulletSimulationState& Entry)
-	{
-		StateHistoryBuffer[CurrentHistoryIndex] = Entry;
-		CurrentHistoryIndex = StateHistoryBuffer.GetNextIndex(CurrentHistoryIndex);
-		HistoryCount = FMath::Min(HistoryCount + 1, (uint32)StateHistoryBuffer.Capacity());
-	}
-
-	const FBulletSimulationState* FindHistoryEntryByFrame(int32 FrameNumber) const
-	{
-		if (HistoryCount == 0) return nullptr;
-    
-		uint32 Index = CurrentHistoryIndex;
-		for (uint32 i = 0; i < HistoryCount; ++i)
-		{
-			Index = StateHistoryBuffer.GetPreviousIndex(Index);
-			if (StateHistoryBuffer[Index].FrameNumber == FrameNumber)
-				return &StateHistoryBuffer[Index];
-		}
-		return nullptr;
-	}
-	const FBulletSimulationState* GetLatestHistoryEntry() const
-	{
-		if (HistoryCount == 0)
-			return nullptr;
-		return &StateHistoryBuffer[StateHistoryBuffer.GetPreviousIndex(CurrentHistoryIndex)];
-	}
-	// void ATestActor::PopulateHistoryBuffer()
-	// {
-	// 	if (bResimulating)
-	// 		return;
- //        
-	// 	FBulletSimulationState NewEntry;
-	// 	NewEntry.FrameNumber = CurrentFrameNumber;
-	// 	NewEntry.SimState = GetCurrentState();
- //    
-	// 	// Collect inputs from all players
-	// 	for (const auto& Pair : ActorToBody)
-	// 	{
-	// 		AActor* Actor = Pair.Key;
-	// 		if (LastAppliedInputs.Contains(Actor))
-	// 		{
-	// 			NewEntry.PlayerInputs.Add(Actor, LastAppliedInputs[Actor]);
-	// 		}
-	// 	}
- //    
-	// 	AddHistoryEntry(NewEntry);
-	// }
-
 private:
 	UPROPERTY(EditDefaultsOnly)
 	UStaticMeshComponent* StaticMesh;

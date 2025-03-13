@@ -7,7 +7,6 @@
 #include "LevelInstance/LevelInstanceTypes.h"
 #include "Types/AttributeStorage.h"
 
-
 // Sets default values
 ATestActor::ATestActor()
 {
