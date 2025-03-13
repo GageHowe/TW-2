@@ -43,9 +43,7 @@ public:
 	UFUNCTION()
 	void ApplyInputs(const FBulletPlayerInput& input) const;
 	void EnableDebug();
-
-	UFUNCTION(Server, Reliable, WithValidation)
-	void ServerTest();
+	
 	UFUNCTION(Server, Reliable)
 	void ServerTestSimple();
 

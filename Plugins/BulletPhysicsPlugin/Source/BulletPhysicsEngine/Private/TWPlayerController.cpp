@@ -1,9 +1,8 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
+// this is the player's player controller for ThreadWraith.
 
 #include "TWPlayerController.h"
-
-#include "Commandlets/TextAssetCommandlet.h"
 
 void ATWPlayerController::SyncTimeWithServer()
 {

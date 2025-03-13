@@ -23,7 +23,6 @@ ABasicPhysicsPawn::ABasicPhysicsPawn() : StateHistoryBuffer(128)
 void ABasicPhysicsPawn::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
-	// DOREPLIFETIME(ABasicPhysicsPawn, testdebug);
 	DOREPLIFETIME(ABasicPhysicsPawn, IsPossessed);
 }
 
@@ -66,28 +65,6 @@ void ABasicPhysicsPawn::ApplyInputs(const FBulletPlayerInput& input) const
 	MyRigidBody->applyForce(forceVector, btVector3(0, 0, 0));
 }
 
-void ABasicPhysicsPawn::ServerTest_Implementation()
-{
-	GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Red, TEXT("server rpc in pawn worked!"));
-    
-	IsPossessed = false;
-	if (BulletWorld)
-	{
-		BulletWorld->test2();
-	}
-	else
-	{
-		GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Red, TEXT("BulletWorld is null!"));
-	}
-}
-
-// In your implementation file (.cpp)
-bool ABasicPhysicsPawn::ServerTest_Validate()
-{
-	GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Yellow, TEXT("RPC Validation"));
-	return true;
-}
-
 void ABasicPhysicsPawn::ServerTestSimple_Implementation()
 {
 	GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Green, TEXT("Simple RPC worked!"));
@@ -125,10 +102,7 @@ void ABasicPhysicsPawn::EnableDebug()
 	{
 		GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Yellow, TEXT("No Controller!"));
 	}
-    
-	// ServerTestSimple();
-	// ServerTest();
-
+	
 	if (auto pc = Cast<ATWPlayerController>(GetController()))
 	{
 		GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Yellow, TEXT("Correct Player Controller Found"));

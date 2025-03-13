@@ -157,12 +157,6 @@ protected:
 	virtual void BeginPlay() override;
 public:	
 	virtual void Tick(float DeltaTime) override;
-	
-	UFUNCTION(BlueprintCallable, Server, Reliable)
-	void SR_test();
-
-	UFUNCTION()
-	void test2();
 
 	// use this to completely remove the body and references to it
 	// E.g. when destroying an actor

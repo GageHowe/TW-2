@@ -68,9 +68,9 @@ void ATestActor::Tick(float DeltaTime)
 		{
 			AActor* Actor = Pair.Key;
 			TMpscQueue<FBulletPlayerInput>& Queue = *Pair.Value;
-			if (Queue.IsEmpty())
-			{ // empty, do nothing
-			//	GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Blue, TEXT("packet dropped, 0"));
+			if (Queue.IsEmpty()) {
+				// empty, do nothing
+				//	GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Blue, TEXT("packet dropped, 0"));
 			} else
 			{ // apply input
 				auto optional = Queue.Dequeue();
@@ -92,11 +92,6 @@ void ATestActor::Tick(float DeltaTime)
 		// MC_SendStateToClients(CurrentState, );
 	}
 	CurrentFrameNumber++;
-}
-
-void ATestActor::SR_test_Implementation()
-{
-	if (HasAuthority()) { GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::White, TEXT("test worked")); }
 }
 
 void ATestActor::SendInputToServer(AActor* actor, FBulletPlayerInput input)
@@ -137,12 +132,6 @@ void ATestActor::MC_SendStateToClients_Implementation(FBulletSimulationState Sta
 		// // Process the state and inputs
 		// ProcessSimulationUpdate(State, LastActorInputs);
 	}
-}
-
-
-void ATestActor::test2()
-{
-	GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Green, TEXT("sent rpc worked!"));
 }
 
 
