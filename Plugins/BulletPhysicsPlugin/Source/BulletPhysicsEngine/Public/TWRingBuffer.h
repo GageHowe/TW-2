@@ -25,8 +25,8 @@ public:
         Buffer[Head] = Item;
         Head = (Head + 1) % Capacity;
         if (Size < Capacity) { Size++; }
-        UE_LOG(LogTemp, Warning, TEXT("Pushed, head: %i"), Head);
-	    GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Yellow, FString::Printf(TEXT("Pushed, head: %i"), Head));
+     //    UE_LOG(LogTemp, Warning, TEXT("Pushed, head: %i"), Head);
+	    // GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Yellow, FString::Printf(TEXT("Pushed, head: %i"), Head));
     }
 
     /** Get item at position (0 is most recent, 1 is one before that, etc.) */
@@ -44,8 +44,8 @@ public:
         {
             Index += Capacity;
         }
-        UE_LOG(LogTemp, Warning, TEXT("GOT: %i"),Index );
-        GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Yellow, FString::Printf(TEXT("GOT: %i"), Index));
+        // UE_LOG(LogTemp, Warning, TEXT("GOT: %i"),Index );
+        // GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Yellow, FString::Printf(TEXT("GOT: %i"), Index));
         return Buffer[Index];
     }
 

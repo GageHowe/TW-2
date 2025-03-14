@@ -12,7 +12,6 @@
 ATestActor::ATestActor()
 {
 	PrimaryActorTick.bCanEverTick = true;
-	// SetReplicates(true);
 	bReplicates = true;
 	bAlwaysRelevant = true;
 	bOnlyRelevantToOwner = false;
@@ -24,35 +23,16 @@ void ATestActor::BeginPlay()
 	Super::BeginPlay();
 
 	BtCollisionConfig = new btDefaultCollisionConfiguration();
-	
 	BtCollisionDispatcher = new btCollisionDispatcher(BtCollisionConfig);
 	BtBroadphase = new btDbvtBroadphase();
 	mt = new btSequentialImpulseConstraintSolver;
 	mt->setRandSeed(1234);
 	BtConstraintSolver = mt;
-	
 	BtWorld = new btDiscreteDynamicsWorld(BtCollisionDispatcher, BtBroadphase, BtConstraintSolver, BtCollisionConfig);
-	BtWorld->setGravity(btVector3(0, 0, 0));
+	BtWorld->setGravity(btVector3(0, 0, -9.8));
 	
-	//BtWorld->setDebugDrawer(BtDebugDraw);
-	//BtWorld->debugDrawWorld();
-	// I mess with a few settings on BtWorld->getSolverInfo() but they're specific to my needs	
-
 	// Gravity vector in our units (1=1cm)
-	
 	//getSimulationIslandManager()->setSplitIslands(false);
-
-	// example of adding a plane in c++
-	/*
-	plane = new btStaticPlaneShape(btVector3(0, 0, 1), 0);
-	btTransform t;
-	t.setIdentity();
-	t.setOrigin(btVector3(0, 0, 0));
-	auto MotionState = new btDefaultMotionState(t);
-	btRigidBody::btRigidBodyConstructionInfo info(0.0, MotionState, plane);
-	btRigidBody* body = new btRigidBody(info);
-	BtWorld->addRigidBody(body);*/
-
 }
 
 // Called every frame
@@ -71,7 +51,7 @@ void ATestActor::Tick(float DeltaTime)
 			if (Queue.IsEmpty()) {
 				// empty, use last input
 				// auto input = 
-				//	GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Blue, TEXT("packet dropped, 0"));
+					// GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Blue, TEXT("packet dropped, 0"));
 			} else
 			{ // apply input
 				auto optional = Queue.Dequeue();
@@ -79,12 +59,12 @@ void ATestActor::Tick(float DeltaTime)
 				auto pawn = Cast<ABasicPhysicsPawn>(Actor);
 				pawn->ApplyInputs(input);
 				// GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Blue, TEXT("dequeued input, 1"));
-				if (Queue.IsEmpty())
+				if (!Queue.IsEmpty())
 				{ // apply second input if available
 					auto optional2 = Queue.Dequeue();
 					auto input2 = optional.GetValue();
 					pawn->ApplyInputs(input2);
-				//	GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Blue, TEXT("dequeued extra input, 2"));
+					// GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Blue, TEXT("dequeued extra input, 2"));
 				}
 			}
 		}
@@ -128,8 +108,9 @@ void ATestActor::MC_SendStateToClients_Implementation(FBulletSimulationState Ser
 		ATWPlayerController* TWPC = Cast<ATWPlayerController>(PC);
 		if (!TWPC) return; // check validity
 		double offset = TWPC->TimeOffset;
-		int framesToRewind = FMath::RoundToInt(offset * 60.0f);
+		int framesToRewind = FMath::RoundToInt(offset / FixedDeltaTime);
 		if (needsResim)
+		// if (debugShouldResim)
 		{
 			SetLocalState(ServerState); // reset
 			for (int i = 0; i < framesToRewind; i++) // simulate up to prediction
@@ -148,9 +129,18 @@ void ATestActor::MC_SendStateToClients_Implementation(FBulletSimulationState Ser
 				// step forward
 				StepPhysics(FixedDeltaTime, 0);
 			}
+			debugShouldResim = false;
 		}
 	}
 }
+
+void ATestActor::SR_debugResim_Implementation()
+{
+	debugShouldResim = true;
+}
+
+
+
 
 
 
@@ -242,18 +232,10 @@ btRigidBody* ATestActor::AddRigidBodyAndReturn(AActor* Body, float Friction, flo
 	return rb;
 }
 
-// old version
-// void ATestActor::AddRigidBody(AActor* Body, float Friction, float Restitution, int& ID,float mass)
-// {
-// 	AddRigidBody(Body, GetCachedDynamicShapeData(Body, mass), Friction, Restitution);
-// 	ID = BtRigidBodies.Num() - 1;
-// }
-
 void ATestActor::UpdatePlayertransform(AActor* player, int ID)
 {
 		BtWorld->getCollisionObjectArray()[ID]->setWorldTransform(BulletHelpers::ToBt(player->GetActorTransform(), GetActorLocation()));
 }
-
 
 void ATestActor::AddImpulse( int ID, FVector Impulse, FVector Location)
 {

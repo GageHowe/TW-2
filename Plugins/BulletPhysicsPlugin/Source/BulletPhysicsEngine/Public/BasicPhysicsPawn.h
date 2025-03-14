@@ -26,7 +26,7 @@ public:
 	FVector CurrentDirectionalInput = FVector(0, 0, 0);
 	bool CurrentPrimaryInput = false;
 	bool CurrentSecondaryInput = false;
-
+	
 	btRigidBody* MyRigidBody = nullptr;
 	
 	UPROPERTY(EditAnywhere)

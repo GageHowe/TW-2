@@ -50,6 +50,10 @@ public:
 	// int32 CurrentFrameNumber = 0;	// Global current frame number
 	const float FixedDeltaTime = 1.0f / 60.0f;
 
+	bool debugShouldResim = false;
+	UFUNCTION(Server, Reliable)
+	void SR_debugResim();
+
 	// bidirectional map
 	TMap<btRigidBody*, AActor*> BodyToActor;
 	TMap<AActor*, btRigidBody*> ActorToBody;
@@ -247,3 +251,5 @@ public:
 	UFUNCTION(BlueprintCallable)
 	void ResetSim();
 };
+
+

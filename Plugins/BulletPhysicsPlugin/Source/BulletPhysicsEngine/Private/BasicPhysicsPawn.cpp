@@ -56,8 +56,8 @@ void ABasicPhysicsPawn::Tick(float DeltaTime)
 		FTWPlayerInput input = FTWPlayerInput();
 		input.MovementInput = CurrentDirectionalInput;
 		BulletWorld->LocalInputBuffer.Push(input);
-		GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Yellow, FString::Printf(TEXT("Pushed input: %f, %f, %f"), input.MovementInput.X, input.MovementInput.Y, input.MovementInput.Z));
-		UE_LOG(LogTemp, Warning, TEXT("Pushed input: %f, %f, %f"), input.MovementInput.X, input.MovementInput.Y, input.MovementInput.Z );
+		// GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Yellow, FString::Printf(TEXT("Pushed input: %f, %f, %f"), input.MovementInput.X, input.MovementInput.Y, input.MovementInput.Z));
+		// UE_LOG(LogTemp, Warning, TEXT("Pushed input: %f, %f, %f"), input.MovementInput.X, input.MovementInput.Y, input.MovementInput.Z );
 		ApplyInputs(input);
 		SendInputsToServer(this, input);
 	}
@@ -109,21 +109,23 @@ void ABasicPhysicsPawn::SetupPlayerInputComponent(class UInputComponent* ThisInp
 
 void ABasicPhysicsPawn::EnableDebug()
 {
-	if (GetController())
-	{
-		GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Yellow, 
-			FString::Printf(TEXT("Controller: %s"), *GetController()->GetName()));
-	}
-	else
-	{
-		GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Yellow, TEXT("No Controller!"));
-	}
-	
-	if (auto pc = Cast<ATWPlayerController>(GetController()))
-	{
-		GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Yellow, TEXT("Correct Player Controller Found"));
-		pc->SyncTimeWithServer();
-	}
+	// if (GetController())
+	// {
+	// 	GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Yellow, 
+	// 		FString::Printf(TEXT("Controller: %s"), *GetController()->GetName()));
+	// }
+	// else
+	// {
+	// 	GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Yellow, TEXT("No Controller!"));
+	// }
+	//
+	// if (auto pc = Cast<ATWPlayerController>(GetController()))
+	// {
+	// 	GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Yellow, TEXT("Correct Player Controller Found"));
+	// 	pc->SyncTimeWithServer();
+	// }
+
+	BulletWorld->debugShouldResim = true;
 }
 
 void ABasicPhysicsPawn::SendInputsToServer_Implementation(AActor* actor, FTWPlayerInput input)
