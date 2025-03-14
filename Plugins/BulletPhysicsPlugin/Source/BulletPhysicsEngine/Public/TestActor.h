@@ -13,6 +13,7 @@
 #include "Components/ShapeComponent.h"
 #include <functional>
 #include <queue>
+class ABasicPhysicsPawn; // forward declaration
 #include "BlueprintEditor.h"
 #include "HairStrandsInterface.h"
 #include "Engine/PackageMapClient.h"
@@ -35,8 +36,17 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FBulletSimulationState CurrentState;
 
+	// Server-only state buffer
+	const int32 MaxHistoryLength = 128;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	int32 CurrentFrameNumber = 0;	// Global current frame number
+	TArray<FBulletSimulationState> StateHistory;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	ABasicPhysicsPawn* LocalPawn; // this is set on PossessedBy
+
+	// Frames
+	// UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	// int32 CurrentFrameNumber = 0;	// Global current frame number
 	const float FixedDeltaTime = 1.0f / 60.0f;
 
 	// bidirectional map
@@ -45,68 +55,24 @@ public:
 	
 	// server's list of input Cbuffers for each pawn
 	TMap<AActor*, TUniquePtr<TMpscQueue<FBulletPlayerInput>>> InputBuffers;
+	
 	virtual void GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const override;
 
 	UFUNCTION()
 	void SendInputToServer(AActor* actor, FBulletPlayerInput input);
 
-	
-
-	TCircularBuffer<FBulletSimulationState> StateHistoryBuffer = TCircularBuffer<FBulletSimulationState>(128);
-	uint32 CurrentHistoryIndex = 0;
-	uint32 HistoryCount = 0;
-	
-	// Simple helper methods
-	void AddHistoryEntry(const FBulletSimulationState& Entry)
-	{
-		StateHistoryBuffer[CurrentHistoryIndex] = Entry;
-		CurrentHistoryIndex = StateHistoryBuffer.GetNextIndex(CurrentHistoryIndex);
-		HistoryCount = FMath::Min(HistoryCount + 1, (uint32)StateHistoryBuffer.Capacity());
-	}
-
-	const FBulletSimulationState* FindHistoryEntryByFrame(int32 FrameNumber) const
-	{
-		if (HistoryCount == 0) return nullptr;
-    
-		uint32 Index = CurrentHistoryIndex;
-		for (uint32 i = 0; i < HistoryCount; ++i)
-		{
-			Index = StateHistoryBuffer.GetPreviousIndex(Index);
-			if (StateHistoryBuffer[Index].FrameNumber == FrameNumber)
-				return &StateHistoryBuffer[Index];
-		}
-		return nullptr;
-	}
-	const FBulletSimulationState* GetLatestHistoryEntry() const
-	{
-		if (HistoryCount == 0)
-			return nullptr;
-		return &StateHistoryBuffer[StateHistoryBuffer.GetPreviousIndex(CurrentHistoryIndex)];
-	}
-
-	UFUNCTION(BlueprintCallable)
-	int SumMyInputBuffers() const
-	{
-		int TotalEntries = 0;
-		for (const auto& Pair : InputBuffers)
-		{
-			// TotalEntries += Pair.Value.Capacity();
-			TotalEntries += 0;
-		}
-		return TotalEntries;
-	}
-
 	UFUNCTION(BlueprintCallable)
 	FBulletSimulationState GetCurrentState() const
 	{
 		FBulletSimulationState thisState;
-		thisState.FrameNumber = CurrentFrameNumber;
+		// thisState.FrameNumber = CurrentFrameNumber;
+		thisState.CurrentTime = GetWorld()->GetTimeSeconds();
 		// construct and add all object states
 		for (const auto& tuple : BodyToActor)
 		{
 			FBulletObjectState os;
 			btRigidBody* body = tuple.Key;
-
+			os.Actor = tuple.Value;
 			os.Transform = BulletHelpers::ToUE(body->getWorldTransform(), GetActorLocation());
 			os.Velocity = BulletHelpers::ToUEDir(body->getLinearVelocity(), true);
 			os.AngularVelocity = BulletHelpers::ToUEDir(body->getAngularVelocity(), true);
@@ -115,12 +81,38 @@ public:
 		}
 		return thisState;
 	}
+	
+	void SetLocalState(FBulletSimulationState state)
+	{
+		if (HasAuthority()) {
+			GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Yellow, TEXT("Tried to run SetLocalState on server"));
+			return;
+		} else {
+			// Apply the state to our objects
+			for (const auto& objState : state.ObjectStates)
+			{
+				if (ActorToBody.Contains(objState.Actor))
+				{
+					UE_LOG(LogTemp, Warning, TEXT("SetLocalState: Actor found!"));
+					btRigidBody* body = ActorToBody[objState.Actor];
+            
+					// Apply physics state
+					body->clearForces();
+					body->setWorldTransform(BulletHelpers::ToBt(objState.Transform, GetActorLocation()));
+					body->setLinearVelocity(BulletHelpers::ToBtDir(objState.Velocity, true));
+					body->setAngularVelocity(BulletHelpers::ToBtDir(objState.AngularVelocity, true));
+				}
+				else
+				{
+					UE_LOG(LogTemp, Warning, TEXT("SetLocalState: Actor not found in ActorToBody map"));
+				}
+			}
+		}
+	}
 
-	// find a way to send map of actor*s to inputs
+	// send state and actors' last input
 	UFUNCTION(BlueprintCallable, NetMulticast, Unreliable)
-	// void MC_SendStateToClients(FBulletSimulationState state, TMap<AActor*, FBulletPlayerInput> LastActorInputs);
-	// void MC_SendStateToClients(FBulletSimulationState state, TArray<TPair<AActor*, FBulletPlayerInput>> inputs);
-	void MC_SendStateToClients(FBulletSimulationState State, const TArray<AActor*>& InputActors, const TArray<FBulletPlayerInput>& PlayerInputs);
+	void MC_SendStateToClients(FBulletSimulationState ServerState, const TArray<AActor*>& InputActors, const TArray<FBulletPlayerInput>& PlayerInputs);
 
 	// sets the state of the physics world, called by
 	// BasicPhysicsPawn.resim()

@@ -37,6 +37,14 @@ void ABasicPhysicsPawn::BeginPlay()
 	BulletWorld = world;
 	MyRigidBody = world->AddRigidBodyAndReturn(this, 0.2, 0.2, 1);
 	if (!MyRigidBody) { GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Red, TEXT("WARNING RigidBody ptr is null")); }
+
+	if (IsLocallyControlled())
+	{
+		BulletWorld->LocalPawn = this;
+	}
+
+	BulletWorld->ActorToBody.Add(this, MyRigidBody);
+	BulletWorld->BodyToActor.Add(MyRigidBody, this);
 }
 
 void ABasicPhysicsPawn::Tick(float DeltaTime)
@@ -74,6 +82,10 @@ void ABasicPhysicsPawn::PossessedBy(AController* NewController)
 {
 	Super::PossessedBy(NewController);
 	IsPossessed = true;
+	if (BulletWorld && IsLocallyControlled())
+	{
+		BulletWorld->LocalPawn = this;
+	}
 }
 
 void ABasicPhysicsPawn::UnPossessed()

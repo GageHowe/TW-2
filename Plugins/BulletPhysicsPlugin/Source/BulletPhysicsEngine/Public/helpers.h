@@ -29,10 +29,6 @@ struct FBulletPlayerInput
 
 	UPROPERTY(BlueprintReadWrite)
 	AActor* Player = nullptr;
-	// is this even needed?
-
-	UPROPERTY(BlueprintReadWrite)
-	int32 FrameNumber = 0; // Frame number for this input; is this necessary?
 };
 
 USTRUCT(BlueprintType) // A FBulletObjectState is the instantaneous state of one object in a frame
@@ -51,19 +47,19 @@ struct FBulletObjectState
 
 	UPROPERTY(BlueprintReadWrite)
 	FVector AngularVelocity;
-
-	UPROPERTY(BlueprintReadWrite)
-	int32 FrameNumber;
+	
 };
 
 USTRUCT(BlueprintType) // A FBulletSimulationState is an array of all object states
 struct FBulletSimulationState
 {
 	GENERATED_BODY()
+	
 	UPROPERTY()
 	TArray<FBulletObjectState> ObjectStates = TArray<FBulletObjectState>();
+
 	UPROPERTY()
-	int32 FrameNumber = 0;
+	double CurrentTime = 0;
 };
 
 /**

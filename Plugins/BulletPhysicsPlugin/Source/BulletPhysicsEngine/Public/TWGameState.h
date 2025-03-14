@@ -15,3 +15,4 @@ class BULLETPHYSICSENGINE_API ATWGameState : public AGameState
 	GENERATED_BODY()
 	
 };
+

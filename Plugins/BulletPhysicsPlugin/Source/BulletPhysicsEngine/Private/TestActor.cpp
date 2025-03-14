@@ -4,6 +4,7 @@
 #include "TestActor.h"
 
 #include "BasicPhysicsPawn.h"
+#include "TWPlayerController.h"
 #include "LevelInstance/LevelInstanceTypes.h"
 #include "Types/AttributeStorage.h"
 
@@ -68,7 +69,8 @@ void ATestActor::Tick(float DeltaTime)
 			AActor* Actor = Pair.Key;
 			TMpscQueue<FBulletPlayerInput>& Queue = *Pair.Value;
 			if (Queue.IsEmpty()) {
-				// empty, do nothing
+				// empty, use last input
+				// auto input = 
 				//	GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Blue, TEXT("packet dropped, 0"));
 			} else
 			{ // apply input
@@ -78,7 +80,7 @@ void ATestActor::Tick(float DeltaTime)
 				pawn->ApplyInputs(input);
 				// GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Blue, TEXT("dequeued input, 1"));
 				if (Queue.IsEmpty())
-				{ // apply second input if  available
+				{ // apply second input if available
 					auto optional2 = Queue.Dequeue();
 					auto input2 = optional.GetValue();
 					pawn->ApplyInputs(input2);
@@ -88,9 +90,19 @@ void ATestActor::Tick(float DeltaTime)
 		}
 		// send state
 		CurrentState = GetCurrentState();
-		// MC_SendStateToClients(CurrentState, );
+		StateHistory.Add(CurrentState);
+		if (StateHistory.Num() > MaxHistoryLength)
+		{
+			StateHistory.RemoveAt(0);
+		}
+		TArray<AActor*> InputActorArray; // TODO: need to populate these
+		TArray<FBulletPlayerInput> InputArray;
+
+		// in the future, investigate filtering CurrentState by
+		// proximity/look direction/etc to client to save bandwidth
+		MC_SendStateToClients(CurrentState, InputActorArray, InputArray);
 	}
-	CurrentFrameNumber++;
+	// CurrentFrameNumber++; // depricated
 }
 
 void ATestActor::SendInputToServer(AActor* actor, FBulletPlayerInput input)
@@ -102,34 +114,37 @@ void ATestActor::SendInputToServer(AActor* actor, FBulletPlayerInput input)
 		InputBuffers.Add(actor, MakeUnique<TMpscQueue<FBulletPlayerInput>>());
 	}
 	InputBuffers[actor]->Enqueue(input);
-	
-	// GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Yellow, FString::Printf(TEXT("Server: total inputs in buffer: %i"), SumMyInputBuffers()));
 }
 
-void ATestActor::MC_SendStateToClients_Implementation(FBulletSimulationState State, const TArray<AActor*>& InputActors,
+void ATestActor::MC_SendStateToClients_Implementation(FBulletSimulationState ServerState, const TArray<AActor*>& InputActors,
 	const TArray<FBulletPlayerInput>& PlayerInputs)
 {
 	if (!HasAuthority())
 	{
-		// Reconstruct the map from the arrays
-		TMap<AActor*, FBulletPlayerInput> LastActorInputs;
-		const int32 Count = FMath::Min(InputActors.Num(), PlayerInputs.Num());
-		for (int32 i = 0; i < Count; ++i)
+		bool needsResim = true;
+		// determine history frame to compare to, compare
+		// against server state to decide if a resim is
+		// necessary. For now, assume true
+		APlayerController* PC = GetWorld()->GetFirstPlayerController();
+		ATWPlayerController* TWPC = Cast<ATWPlayerController>(PC);
+		double offset = TWPC->TimeOffset;
+		int framesToRewind = FMath::RoundToInt(offset * 60.0f);
+		if (needsResim)
 		{
-			if (InputActors[i] != nullptr)
+			SetLocalState(ServerState);
+			for (int i = 0; i < framesToRewind; i++)
 			{
-				LastActorInputs.Add(InputActors[i], PlayerInputs[i]);
+				// apply local input from buffer
+				for (int j = 0; i < InputActors.Num(); i++)
+				{ // apply other actors' inputs
+					Cast<ABasicPhysicsPawn>(InputActors[i])->ApplyInputs(PlayerInputs[i]);
+				}
+				// StepPhysics(FixedDeltaTime, 0);
 			}
+			//		for others in map:
+			//			apply others last input
+			//		step physics
 		}
-		
-		// TODO RESIMULATE
-		// Run simulate with delta time and apply inputs
-		// for other clients, apply last known input every frame. Or don't? This will cause noticeable desyncs if too long before a resim
-		// for self, apply last buffer of inputs up to now
-		// The player should notice no change if previously predicted right
-		
-		// // Process the state and inputs
-		// ProcessSimulationUpdate(State, LastActorInputs);
 	}
 }
 
