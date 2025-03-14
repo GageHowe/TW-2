@@ -13,7 +13,7 @@ public:
     /** Constructor - initialize with capacity of 64 */
     TWRingBuffer()
         : Buffer()
-        , Capacity(64)
+        , Capacity(128)
         , Size(0)
         , Head(0)
     {
@@ -99,8 +99,8 @@ public:
     }
 
 private:
-    T Buffer[64];      // Array to store the data
-    int32 Capacity;    // Fixed capacity (64)
+    T Buffer[128];      // Array to store the data
+    int32 Capacity;    // Fixed capacity (128)
     int32 Size;        // Current number of elements
     int32 Head;        // Position to write the next element
 };
