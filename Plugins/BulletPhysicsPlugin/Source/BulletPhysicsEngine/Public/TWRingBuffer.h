@@ -24,12 +24,9 @@ public:
     {
         Buffer[Head] = Item;
         Head = (Head + 1) % Capacity;
-        
-        // If not yet full, increment size
-        if (Size < Capacity)
-        {
-            Size++;
-        }
+        if (Size < Capacity) { Size++; }
+        UE_LOG(LogTemp, Warning, TEXT("Pushed, head: %i"), Head);
+	    GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Yellow, FString::Printf(TEXT("Pushed, head: %i"), Head));
     }
 
     /** Get item at position (0 is most recent, 1 is one before that, etc.) */
@@ -37,8 +34,8 @@ public:
     {
         if (Position >= Size || Position < 0)
         {
-            // In production code, you might want to use UE_LOG or other error handling
-            // For simplicity, we'll return a default-constructed T
+            UE_LOG(LogTemp, Error, TEXT("TWRingBuffer::Get: Invalid Position"));
+            GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Yellow, FString::Printf(TEXT("BAD POSITION: %i"), Head));
             return T();
         }
             
@@ -47,7 +44,8 @@ public:
         {
             Index += Capacity;
         }
-            
+        UE_LOG(LogTemp, Warning, TEXT("GOT: %i"),Index );
+        GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Yellow, FString::Printf(TEXT("GOT: %i"), Index));
         return Buffer[Index];
     }
 

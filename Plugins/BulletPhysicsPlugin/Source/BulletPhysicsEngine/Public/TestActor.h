@@ -96,7 +96,7 @@ public:
 			{
 				if (ActorToBody.Contains(objState.Actor))
 				{
-					UE_LOG(LogTemp, Warning, TEXT("SetLocalState: Actor found!"));
+					// UE_LOG(LogTemp, Warning, TEXT("SetLocalState: Actor found!"));
 					btRigidBody* body = ActorToBody[objState.Actor];
             
 					// Apply physics state

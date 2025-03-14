@@ -126,6 +126,7 @@ void ATestActor::MC_SendStateToClients_Implementation(FBulletSimulationState Ser
 		// necessary. For now, assume true
 		APlayerController* PC = GetWorld()->GetFirstPlayerController();
 		ATWPlayerController* TWPC = Cast<ATWPlayerController>(PC);
+		if (!TWPC) return; // check validity
 		double offset = TWPC->TimeOffset;
 		int framesToRewind = FMath::RoundToInt(offset * 60.0f);
 		if (needsResim)
@@ -133,13 +134,15 @@ void ATestActor::MC_SendStateToClients_Implementation(FBulletSimulationState Ser
 			SetLocalState(ServerState); // reset
 			for (int i = 0; i < framesToRewind; i++) // simulate up to prediction
 			{
-				for (int j = 0; i < InputActors.Num(); i++)
-				{ // apply other actors' inputs
-					Cast<ABasicPhysicsPawn>(InputActors[i])->ApplyInputs(PlayerInputs[i]);
-				}
+				// for (int j = 0; j < InputActors.Num(); j++)
+				// { // apply other actors' inputs
+				// 	Cast<ABasicPhysicsPawn>(InputActors[j])->ApplyInputs(PlayerInputs[j]);
+				// }
+				
 				// apply local pawn's inputs
 				FTWPlayerInput PastInput = LocalInputBuffer.Get(framesToRewind-i);
 				LocalPawn->ApplyInputs(PastInput);
+				
 				// step forward
 				StepPhysics(FixedDeltaTime, 0);
 			}
