@@ -67,7 +67,7 @@ void ATestActor::Tick(float DeltaTime)
 		for (auto& Pair : InputBuffers)
 		{
 			AActor* Actor = Pair.Key;
-			TMpscQueue<FBulletPlayerInput>& Queue = *Pair.Value;
+			TMpscQueue<FTWPlayerInput>& Queue = *Pair.Value;
 			if (Queue.IsEmpty()) {
 				// empty, use last input
 				// auto input = 
@@ -96,28 +96,27 @@ void ATestActor::Tick(float DeltaTime)
 			StateHistory.RemoveAt(0);
 		}
 		TArray<AActor*> InputActorArray; // TODO: need to populate these
-		TArray<FBulletPlayerInput> InputArray;
+		TArray<FTWPlayerInput> InputArray;
 
 		// in the future, investigate filtering CurrentState by
 		// proximity/look direction/etc to client to save bandwidth
 		MC_SendStateToClients(CurrentState, InputActorArray, InputArray);
 	}
-	// CurrentFrameNumber++; // depricated
 }
 
-void ATestActor::SendInputToServer(AActor* actor, FBulletPlayerInput input)
+void ATestActor::SendInputToServer(AActor* actor, FTWPlayerInput input)
 {
 	// GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Yellow, FString::Printf(TEXT("recieved: %i"), true));
 	// If this actor doesn't have an input buffer yet, create one
 	if (!InputBuffers.Contains(actor))
 	{
-		InputBuffers.Add(actor, MakeUnique<TMpscQueue<FBulletPlayerInput>>());
+		InputBuffers.Add(actor, MakeUnique<TMpscQueue<FTWPlayerInput>>());
 	}
 	InputBuffers[actor]->Enqueue(input);
 }
 
 void ATestActor::MC_SendStateToClients_Implementation(FBulletSimulationState ServerState, const TArray<AActor*>& InputActors,
-	const TArray<FBulletPlayerInput>& PlayerInputs)
+	const TArray<FTWPlayerInput>& PlayerInputs)
 {
 	if (!HasAuthority())
 	{
@@ -131,19 +130,19 @@ void ATestActor::MC_SendStateToClients_Implementation(FBulletSimulationState Ser
 		int framesToRewind = FMath::RoundToInt(offset * 60.0f);
 		if (needsResim)
 		{
-			SetLocalState(ServerState);
-			for (int i = 0; i < framesToRewind; i++)
+			SetLocalState(ServerState); // reset
+			for (int i = 0; i < framesToRewind; i++) // simulate up to prediction
 			{
-				// apply local input from buffer
 				for (int j = 0; i < InputActors.Num(); i++)
 				{ // apply other actors' inputs
 					Cast<ABasicPhysicsPawn>(InputActors[i])->ApplyInputs(PlayerInputs[i]);
 				}
-				// StepPhysics(FixedDeltaTime, 0);
+				// apply local pawn's inputs
+				FTWPlayerInput PastInput = LocalInputBuffer.Get(framesToRewind-i);
+				LocalPawn->ApplyInputs(PastInput);
+				// step forward
+				StepPhysics(FixedDeltaTime, 0);
 			}
-			//		for others in map:
-			//			apply others last input
-			//		step physics
 		}
 	}
 }

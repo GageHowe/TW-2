@@ -7,6 +7,7 @@
 #include "helpers.h"
 #include "bthelper.h"
 #include "Net/UnrealNetwork.h"
+#include "TWRingBuffer.h"
 #include "BasicPhysicsPawn.generated.h"
 
 UCLASS()
@@ -22,9 +23,9 @@ public:
 	virtual void PossessedBy(AController* NewController) override;
 	virtual void UnPossessed() override;
 	
-	FVector DirectionalInput = FVector(0, 0, 0);
-	bool PrimaryInput = false;
-	bool SecondaryInput = false;
+	FVector CurrentDirectionalInput = FVector(0, 0, 0);
+	bool CurrentPrimaryInput = false;
+	bool CurrentSecondaryInput = false;
 
 	btRigidBody* MyRigidBody = nullptr;
 	
@@ -37,14 +38,14 @@ public:
 	bool IsPossessed = true;
 
 	UFUNCTION()
-	void ApplyInputs(const FBulletPlayerInput& input) const;
+	void ApplyInputs(const FTWPlayerInput& input) const;
 	void EnableDebug();
 	
 	UFUNCTION(Server, Reliable)
 	void ServerTestSimple();
 
 	UFUNCTION(Server, Unreliable)
-	void SendInputsToServer(AActor* actor, FBulletPlayerInput input);
+	void SendInputsToServer(AActor* actor, FTWPlayerInput input);
 	
 private:
 	UPROPERTY(EditDefaultsOnly)
@@ -57,8 +58,8 @@ protected:
 	ATestActor* world;
 
 	// set inputs on axis event
-	void SetForwardInput(float Value) { DirectionalInput.X = Value; }
-	void SetRightInput(float Value) { DirectionalInput.Y = Value; }
-	void SetUpInput(float Value) { DirectionalInput.Z = Value; }
+	void SetForwardInput(float Value) { CurrentDirectionalInput.X = Value; }
+	void SetRightInput(float Value) { CurrentDirectionalInput.Y = Value; }
+	void SetUpInput(float Value) { CurrentDirectionalInput.Z = Value; }
 };
 

@@ -23,6 +23,7 @@ class ABasicPhysicsPawn; // forward declaration
 #include "GameFramework/GameSession.h"
 #include "GameFramework/PlayerState.h"
 #include "GameFramework/GameState.h"
+#include "TWRingBuffer.h"
 #include "TestActor.generated.h"
 
 UCLASS()
@@ -54,12 +55,14 @@ public:
 	TMap<AActor*, btRigidBody*> ActorToBody;
 	
 	// server's list of input Cbuffers for each pawn
-	TMap<AActor*, TUniquePtr<TMpscQueue<FBulletPlayerInput>>> InputBuffers;
+	TMap<AActor*, TUniquePtr<TMpscQueue<FTWPlayerInput>>> InputBuffers;
+
+	TWRingBuffer<FTWPlayerInput> LocalInputBuffer;
 	
 	virtual void GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const override;
 
 	UFUNCTION()
-	void SendInputToServer(AActor* actor, FBulletPlayerInput input);
+	void SendInputToServer(AActor* actor, FTWPlayerInput input);
 
 	UFUNCTION(BlueprintCallable)
 	FBulletSimulationState GetCurrentState() const
@@ -112,7 +115,7 @@ public:
 
 	// send state and actors' last input
 	UFUNCTION(BlueprintCallable, NetMulticast, Unreliable)
-	void MC_SendStateToClients(FBulletSimulationState ServerState, const TArray<AActor*>& InputActors, const TArray<FBulletPlayerInput>& PlayerInputs);
+	void MC_SendStateToClients(FBulletSimulationState ServerState, const TArray<AActor*>& InputActors, const TArray<FTWPlayerInput>& PlayerInputs);
 
 	// sets the state of the physics world, called by
 	// BasicPhysicsPawn.resim()

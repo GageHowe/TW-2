@@ -52,8 +52,11 @@ void ABasicPhysicsPawn::Tick(float DeltaTime)
 	Super::Tick(DeltaTime);
 	if (IsLocallyControlled())
 	{
-		FBulletPlayerInput input = FBulletPlayerInput();
-		input.MovementInput = DirectionalInput;
+		// construct input and add to local buffer
+		FTWPlayerInput input = FTWPlayerInput();
+		input.MovementInput = CurrentDirectionalInput;
+		BulletWorld->LocalInputBuffer.Push(input);
+		
 		ApplyInputs(input);
 		SendInputsToServer(this, input);
 	}
@@ -65,7 +68,7 @@ void ABasicPhysicsPawn::Tick(float DeltaTime)
 }
 
 // right now, this just accelerates the pawn, but that's fine for now
-void ABasicPhysicsPawn::ApplyInputs(const FBulletPlayerInput& input) const
+void ABasicPhysicsPawn::ApplyInputs(const FTWPlayerInput& input) const
 {
 	GEngine->AddOnScreenDebugMessage(3, 5.0f, FColor::Green, TEXT("Applying inputs"));
 	btVector3 forceVector = BulletHelpers::ToBtDir(input.MovementInput, true) * 10000.0f;
@@ -122,7 +125,7 @@ void ABasicPhysicsPawn::EnableDebug()
 	}
 }
 
-void ABasicPhysicsPawn::SendInputsToServer_Implementation(AActor* actor, FBulletPlayerInput input)
+void ABasicPhysicsPawn::SendInputsToServer_Implementation(AActor* actor, FTWPlayerInput input)
 {
 	BulletWorld->SendInputToServer(this, input);
 }

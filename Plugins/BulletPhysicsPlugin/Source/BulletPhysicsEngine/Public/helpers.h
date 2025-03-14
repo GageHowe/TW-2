@@ -17,7 +17,7 @@ struct Ftris
 };
 
 USTRUCT(BlueprintType, Blueprintable)
-struct FBulletPlayerInput
+struct FTWPlayerInput
 {
 	GENERATED_BODY()
 
