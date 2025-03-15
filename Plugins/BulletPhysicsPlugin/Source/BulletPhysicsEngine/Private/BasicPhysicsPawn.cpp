@@ -59,7 +59,7 @@ void ABasicPhysicsPawn::Tick(float DeltaTime)
 		// GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Yellow, FString::Printf(TEXT("Pushed input: %f, %f, %f"), input.MovementInput.X, input.MovementInput.Y, input.MovementInput.Z));
 		// UE_LOG(LogTemp, Warning, TEXT("Pushed input: %f, %f, %f"), input.MovementInput.X, input.MovementInput.Y, input.MovementInput.Z );
 		ApplyInputs(input);
-		SendInputsToServer(this, input);
+		if (!HasAuthority()) {SendInputsToServer(this, input);} // edge case, don't process inputs twice if listen server
 	}
 
 	// world timer stuff
