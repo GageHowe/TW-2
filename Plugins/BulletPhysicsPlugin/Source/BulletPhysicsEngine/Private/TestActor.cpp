@@ -41,6 +41,7 @@ void ATestActor::Tick(float DeltaTime)
 	Super::Tick(DeltaTime);
 	StepPhysics(DeltaTime, 1);
 	randvar = mt->getRandSeed();
+	CurrentState = GetCurrentState();
 	if (HasAuthority())
 	{
 		// consume input
@@ -69,18 +70,15 @@ void ATestActor::Tick(float DeltaTime)
 			}
 		}
 		// send state
-		CurrentState = GetCurrentState();
-		StateHistory.Add(CurrentState);
-		if (StateHistory.Num() > MaxHistoryLength)
-		{
-			StateHistory.RemoveAt(0);
-		}
 		TArray<AActor*> InputActorArray; // TODO: need to populate these
 		TArray<FTWPlayerInput> InputArray;
 
 		// in the future, investigate filtering CurrentState by
 		// proximity/look direction/etc to client to save bandwidth
 		MC_SendStateToClients(CurrentState, InputActorArray, InputArray);
+	} else // if client
+	{
+		StateHistory.Push(CurrentState);
 	}
 }
 
@@ -100,37 +98,35 @@ void ATestActor::MC_SendStateToClients_Implementation(FBulletSimulationState Ser
 {
 	if (!HasAuthority())
 	{
-		bool needsResim = true;
-		// determine history frame to compare to, compare
-		// against server state to decide if a resim is
-		// necessary. For now, assume true
+		// get player controller
 		APlayerController* PC = GetWorld()->GetFirstPlayerController();
-		ATWPlayerController* TWPC = Cast<ATWPlayerController>(PC);
-		if (!TWPC) return; // check validity
-		double offset = TWPC->RoundTripDelay;
-		int framesToRewind = FMath::RoundToInt(offset / FixedDeltaTime);
-		if (needsResim)
-		// if (debugShouldResim)
-		{
-			SetLocalState(ServerState); // reset
-			for (int i = 0; i < framesToRewind; i++) // simulate up to prediction
-			{
-				// for (int j = 0; j < InputActors.Num(); j++)
-				// { // apply other actors' inputs
-				// 	Cast<ABasicPhysicsPawn>(InputActors[j])->ApplyInputs(PlayerInputs[j]);
-				// }
-				
-				// apply local pawn's inputs
-				FTWPlayerInput PastInput = LocalInputBuffer.Get(framesToRewind-i);
-				LocalPawn->ApplyInputs(PastInput);
-				// GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Yellow, FString::Printf(TEXT("Got and applied input: %f, %f, %f"), PastInput.MovementInput.X, PastInput.MovementInput.Y, PastInput.MovementInput.Z));
-				// UE_LOG(LogTemp, Warning, TEXT("Applied input: %f, %f, %f from position %i"), PastInput.MovementInput.X, PastInput.MovementInput.Y, PastInput.MovementInput.Z, framesToRewind-i );
+		ATWPlayerController* TWPC = Cast<ATWPlayerController>(PC); if (!TWPC) return;
 
-				// step forward
-				StepPhysics(FixedDeltaTime, 1);
-			}
-			debugShouldResim = false;
+		int framesToRewind = FMath::RoundToInt(TWPC->RoundTripDelay / FixedDeltaTime);
+		FBulletSimulationState HistoricState = StateHistory.Get(framesToRewind);
+
+		SetLocalState(ServerState); // replace this with interpolation logic
+		// SetLocalStateDiscriminate(ServerState, HistoricState);
+		
+		// simulate up to prediction
+		for (int i = 0; i < framesToRewind; i++)
+		{
+			// for (int j = 0; j < InputActors.Num(); j++)
+			// { // apply other actors' inputs
+			// 	Cast<ABasicPhysicsPawn>(InputActors[j])->ApplyInputs(PlayerInputs[j]);
+			// }
+			
+			// apply local pawn's inputs
+			FTWPlayerInput PastInput = LocalInputBuffer.Get(framesToRewind-i);
+			LocalPawn->ApplyInputs(PastInput);
+			// GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Yellow, FString::Printf(TEXT("Got and applied input: %f, %f, %f"), PastInput.MovementInput.X, PastInput.MovementInput.Y, PastInput.MovementInput.Z));
+			// UE_LOG(LogTemp, Warning, TEXT("Applied input: %f, %f, %f from position %i"), PastInput.MovementInput.X, PastInput.MovementInput.Y, PastInput.MovementInput.Z, framesToRewind-i );
+
+			// step forward
+			StepPhysics(FixedDeltaTime, 1);
 		}
+		debugShouldResim = false;
+	
 	}
 }
 
@@ -138,6 +134,14 @@ void ATestActor::SR_debugResim_Implementation()
 {
 	debugShouldResim = true;
 }
+
+
+
+
+
+
+
+
 
 
 

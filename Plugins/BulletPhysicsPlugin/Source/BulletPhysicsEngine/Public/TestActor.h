@@ -38,9 +38,8 @@ public:
 	FBulletSimulationState CurrentState;
 
 	// Server-only state buffer
-	const int32 MaxHistoryLength = 128;
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	TArray<FBulletSimulationState> StateHistory;
+	// UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TWRingBuffer<FBulletSimulationState> StateHistory;
 	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	ABasicPhysicsPawn* LocalPawn; // this is set on PossessedBy
@@ -54,14 +53,15 @@ public:
 	UFUNCTION(Server, Reliable)
 	void SR_debugResim();
 
-	// bidirectional map
+	// bidirectional map to manage an actor's rigidbody
 	TMap<btRigidBody*, AActor*> BodyToActor;
 	TMap<AActor*, btRigidBody*> ActorToBody;
 	
 	// server's list of input Cbuffers for each pawn
 	TMap<AActor*, TUniquePtr<TMpscQueue<FTWPlayerInput>>> InputBuffers;
-
 	TWRingBuffer<FTWPlayerInput> LocalInputBuffer;
+
+	FBulletObjectState* InterpolationError;
 	
 	virtual void GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const override;
 
@@ -95,15 +95,11 @@ public:
 			GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Yellow, TEXT("Tried to run SetLocalState on server"));
 			return;
 		} else {
-			// Apply the state to our objects
 			for (const auto& objState : state.ObjectStates)
 			{
 				if (ActorToBody.Contains(objState.Actor))
 				{
-					// UE_LOG(LogTemp, Warning, TEXT("SetLocalState: Actor found!"));
 					btRigidBody* body = ActorToBody[objState.Actor];
-            
-					// Apply physics state
 					body->clearForces();
 					body->setWorldTransform(BulletHelpers::ToBt(objState.Transform, GetActorLocation()));
 					body->setLinearVelocity(BulletHelpers::ToBtDir(objState.Velocity, true));
@@ -116,6 +112,88 @@ public:
 			}
 		}
 	}
+
+void SetLocalStateDiscriminate(FBulletSimulationState ServerState, FBulletSimulationState HistoricState)
+{
+    if (HasAuthority()) {
+        GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Yellow, TEXT("Tried to run SetLocalStateDiscriminate on server"));
+        return;
+    } else {
+        // Define reasonable thresholds
+        constexpr float PositionThreshold = 100.0f;      // in UE units (cm)
+        constexpr float VelocityThreshold = 2000.0f;     // in UE units (cm/s)
+        constexpr float AngularVelocityThreshold = 2.0f;  // in radians/s
+        
+        // Create a map of actors to their states for quick lookup in historic state
+        TMap<AActor*, FBulletObjectState> HistoricStateMap;
+        for (const auto& objState : HistoricState.ObjectStates)
+        {
+            if (objState.Actor != nullptr) {
+                HistoricStateMap.Add(objState.Actor, objState);
+            }
+        }
+        
+        for (const auto& serverObjState : ServerState.ObjectStates)
+        {
+            if (serverObjState.Actor == nullptr) {
+                continue;
+            }
+            
+            // Try to find this actor in the historic state
+            if (HistoricStateMap.Contains(serverObjState.Actor) && ActorToBody.Contains(serverObjState.Actor))
+            {
+                const FBulletObjectState& historicObjState = HistoricStateMap[serverObjState.Actor];
+                btRigidBody* body = ActorToBody[serverObjState.Actor];
+                
+                // Calculate difference between server and historic state
+                // Using your operator- implementation
+                FBulletObjectState stateDifference = serverObjState - historicObjState;
+                
+                // Calculate magnitudes of differences
+                float positionDiff = stateDifference.Transform.GetLocation().Size();
+                float velocityDiff = stateDifference.Velocity.Size();
+                float angularVelocityDiff = stateDifference.AngularVelocity.Size();
+                
+                // Check if correction is needed
+                bool needsCorrection = 
+                    positionDiff > PositionThreshold || 
+                    velocityDiff > VelocityThreshold || 
+                    angularVelocityDiff > AngularVelocityThreshold;
+                
+                // Apply corrections if needed
+                if (needsCorrection) {
+
+
+                	body->clearForces();
+                	body->setWorldTransform(BulletHelpers::ToBt(serverObjState.Transform, GetActorLocation()));
+                	body->setLinearVelocity(BulletHelpers::ToBtDir(serverObjState.Velocity, true));
+                	body->setAngularVelocity(BulletHelpers::ToBtDir(serverObjState.AngularVelocity, true));
+                	
+                	
+                    UE_LOG(LogTemp, Warning, TEXT("Corrected %s - PosDiff: %f, VelDiff: %f, AngVelDiff: %f"), 
+                        *serverObjState.Actor->GetName(), positionDiff, velocityDiff, angularVelocityDiff);
+                }
+            }
+            else if (ActorToBody.Contains(serverObjState.Actor))
+            {
+                // If actor exists in physics world but not in historic state, always correct
+                btRigidBody* body = ActorToBody[serverObjState.Actor];
+                body->clearForces();
+                body->setWorldTransform(BulletHelpers::ToBt(serverObjState.Transform, GetActorLocation()));
+                body->setLinearVelocity(BulletHelpers::ToBtDir(serverObjState.Velocity, true));
+                body->setAngularVelocity(BulletHelpers::ToBtDir(serverObjState.AngularVelocity, true));
+                
+                UE_LOG(LogTemp, Warning, TEXT("Actor %s not found in historic state, applied full correction"), 
+                    *serverObjState.Actor->GetName());
+            }
+            else
+            {
+                UE_LOG(LogTemp, Warning, TEXT("SetLocalStateDiscriminate: Actor %s not found in ActorToBody map"), 
+                    *serverObjState.Actor->GetName());
+            }
+        }
+    }
+}
 
 	// send state and actors' last input
 	UFUNCTION(BlueprintCallable, NetMulticast, Unreliable)

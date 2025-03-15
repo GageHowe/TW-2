@@ -2,6 +2,8 @@
 
 #include "CoreMinimal.h"
 #include <functional>
+
+#include "HLSLTypeAliases.h"
 #include "Containers/Queue.h"
 #include "GameFramework/Actor.h"
 #include "helpers.generated.h"
@@ -21,8 +23,13 @@ struct FTWPlayerInput
 {
 	GENERATED_BODY()
 
-	UPROPERTY(BlueprintReadWrite)
-	FVector MovementInput = {0,0,0}; // 0-1 on all axes, in local space (x,y,z)
+	UPROPERTY(BlueprintReadWrite) // move this to int8s or bools for bandwidth
+	FVector MovementInput = {0,0,0}; // 0-1 on all axes, in local space
+
+	UPROPERTY()
+	int8 TurnRight = 0;
+	UPROPERTY()
+	int8 TurnUp = 0;
 
 	UPROPERTY(BlueprintReadWrite)
 	bool BoostInput = false; // 0-1
@@ -47,7 +54,32 @@ struct FBulletObjectState
 
 	UPROPERTY(BlueprintReadWrite)
 	FVector AngularVelocity;
+
+	// used for getting state error
+	// Update your operator- to be const-correct
+	FBulletObjectState operator-(const FBulletObjectState& other) const
+	{
+		FBulletObjectState result;
+		result.Actor = Actor;
+		result.Transform.SetLocation(Transform.GetLocation() - other.Transform.GetLocation());
+		result.Transform.SetRotation(Transform.GetRotation() - other.Transform.GetRotation());
+		result.Velocity = Velocity - other.Velocity;
+		result.AngularVelocity = AngularVelocity - other.AngularVelocity;
+
+		return result;
+	}
 	
+	// FBulletObjectState operator+(const FBulletObjectState& other)
+	// {
+	// 	FBulletObjectState result;
+	// 	result.Actor = Actor;
+	// 	result.Transform.SetLocation(Transform.GetLocation() + other.Transform.GetLocation());
+	// 	result.Transform.SetRotation(Transform.GetRotation() + other.Transform.GetRotation());
+	// 	result.Velocity = Velocity + other.Velocity;
+	// 	result.AngularVelocity = AngularVelocity + other.AngularVelocity;
+	//
+	// 	return result;
+	// }
 };
 
 USTRUCT(BlueprintType) // A FBulletSimulationState is an array of all object states

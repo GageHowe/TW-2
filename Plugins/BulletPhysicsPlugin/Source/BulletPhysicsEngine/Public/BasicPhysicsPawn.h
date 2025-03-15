@@ -26,6 +26,9 @@ public:
 	FVector CurrentDirectionalInput = FVector(0, 0, 0);
 	bool CurrentPrimaryInput = false;
 	bool CurrentSecondaryInput = false;
+	bool CurrentBoostInput = false;
+	int8 CurrentTurnRight = 0;
+	int8 CurrentTurnUp = 0;
 	
 	btRigidBody* MyRigidBody = nullptr;
 	
@@ -57,9 +60,23 @@ protected:
 	UPROPERTY(EditDefaultsOnly)
 	ATestActor* world;
 
-	// set inputs on axis event
+	// Inputs
 	void SetForwardInput(float Value) { CurrentDirectionalInput.X = Value; }
 	void SetRightInput(float Value) { CurrentDirectionalInput.Y = Value; }
 	void SetUpInput(float Value) { CurrentDirectionalInput.Z = Value; }
+	void EnableBoost() { CurrentBoostInput = true; }
+	void DisableBoost() { CurrentBoostInput = false; }
+	void SetTurnRightInput(float Val)
+	{ CurrentTurnRight = FMath::Clamp(FMath::RoundToInt(Val * 127.0f), -127, 127); }
+	void SetTurnUpInput(float Val)
+	{ CurrentTurnUp = FMath::Clamp(FMath::RoundToInt(Val * 127.0f), -127, 127); }
+
+	void Interpolate()
+	{
+		if (auto x = BulletWorld->InterpolationError)
+		{
+			// x.
+		}
+	}
 };
 
