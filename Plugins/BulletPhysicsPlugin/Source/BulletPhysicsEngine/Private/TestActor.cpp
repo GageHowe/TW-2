@@ -73,8 +73,8 @@ void ATestActor::Tick(float DeltaTime)
 		TArray<AActor*> InputActorArray; // TODO: need to populate these
 		TArray<FTWPlayerInput> InputArray;
 
-		// in the future, investigate filtering CurrentState by
-		// proximity/look direction/etc to client to save bandwidth
+		// TODO: investigate filtering CurrentState by proximity/look direction/etc to client to save bandwidth
+		// TODO: Don't send inputs of actors/pawns not being controlled
 		MC_SendStateToClients(CurrentState, InputActorArray, InputArray);
 	} else // if client
 	{
@@ -105,6 +105,14 @@ void ATestActor::MC_SendStateToClients_Implementation(FBulletSimulationState Ser
 		int framesToRewind = FMath::RoundToInt(TWPC->RoundTripDelay / FixedDeltaTime);
 		FBulletSimulationState HistoricState = StateHistory.Get(framesToRewind);
 
+		// for (auto& Pair : InterpDeltas)
+		// {
+		// 	if (Cast<ABasicPhysicsPawn>(Pair.Key)->mustCorrectState)
+		// 	{
+		// 		
+		// 	}
+		// }
+		
 		SetLocalState(ServerState); // replace this with interpolation logic
 		// SetLocalStateDiscriminate(ServerState, HistoricState);
 		
@@ -519,8 +527,6 @@ const ATestActor::CachedDynamicShapeData& ATestActor::GetCachedDynamicShapeData(
 {
 	// We re-use compound shapes based on (leaf) BP class
 	const FName ClassName = Actor->GetClass()->GetFName();
-
-	
 
 	// Because we want to support compound colliders, we need to extract all colliders first before
 	// constructing the final body.

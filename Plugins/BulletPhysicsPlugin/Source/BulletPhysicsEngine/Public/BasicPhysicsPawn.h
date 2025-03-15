@@ -29,6 +29,8 @@ public:
 	bool CurrentBoostInput = false;
 	int8 CurrentTurnRight = 0;
 	int8 CurrentTurnUp = 0;
+
+	bool mustCorrectState = false;
 	
 	btRigidBody* MyRigidBody = nullptr;
 	

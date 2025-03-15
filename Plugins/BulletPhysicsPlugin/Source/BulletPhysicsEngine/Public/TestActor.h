@@ -56,6 +56,10 @@ public:
 	// bidirectional map to manage an actor's rigidbody
 	TMap<btRigidBody*, AActor*> BodyToActor;
 	TMap<AActor*, btRigidBody*> ActorToBody;
+
+	// the error clients must correct over an interpolation period
+	// should go down to zero, which means no error
+	TMap<AActor*, FBulletObjectState> InterpDeltas;
 	
 	// server's list of input Cbuffers for each pawn
 	TMap<AActor*, TUniquePtr<TMpscQueue<FTWPlayerInput>>> InputBuffers;
