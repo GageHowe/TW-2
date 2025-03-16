@@ -15,7 +15,7 @@ void ATWPlayerController::SetupTimeSyncTimer()
 {
 	if (!HasAuthority())
 	{
-		GetWorldTimerManager().SetTimer(TimeSyncTimerHandle, this, &ATWPlayerController::SyncTimeWithServer, 1.0f, true);
+		GetWorldTimerManager().SetTimer(TimeSyncTimerHandle, this, &ATWPlayerController::SyncTimeWithServer, 0.2f, true);
 	}
 }
 

@@ -48,34 +48,47 @@ void ATestActor::Tick(float DeltaTime)
 		for (auto& Pair : InputBuffers)
 		{
 			AActor* Actor = Pair.Key;
-			TMpscQueue<FTWPlayerInput>& Queue = *Pair.Value;
-			if (Queue.IsEmpty()) {
-				// empty, use last input
-				// auto input = 
-					// GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Blue, TEXT("packet dropped, 0"));
-			} else
-			{ // apply input
-				auto optional = Queue.Dequeue();
-				auto input = optional.GetValue();
+			auto InputBuf = *Pair.Value;
+			if (!InputBuf.IsEmpty())
+			{
 				auto pawn = Cast<ABasicPhysicsPawn>(Actor);
-				pawn->ApplyInputs(input);
-				// GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Blue, TEXT("dequeued input, 1"));
-				if (!Queue.IsEmpty())
-				{ // apply second input if available
-					auto optional2 = Queue.Dequeue();
-					auto input2 = optional.GetValue();
-					pawn->ApplyInputs(input2);
-					// GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Blue, TEXT("dequeued extra input, 2"));
-				}
+				pawn->ApplyInputs(InputBuf.Get(0));
 			}
 		}
+		
 		// send state
-		TArray<AActor*> InputActorArray; // TODO: need to populate these
+		TArray<AActor*> InputActorArray;
 		TArray<FTWPlayerInput> InputArray;
+
+		// Loop through each actor and get their most recent input
+		for (const auto& Pair : InputBuffers)
+		{
+			AActor* Actor = Pair.Key;
+			TWRingBuffer<FTWPlayerInput>* Buffer = Pair.Value;
+    
+			InputActorArray.Add(Actor);
+    
+			// Get the newest input (or default if empty)
+			if (!Buffer->IsEmpty())
+			{
+				InputArray.Add(Buffer->GetNewest());
+			}
+			else
+			{
+				InputArray.Add(FTWPlayerInput()); // Add default input
+			}
+		}
+
 
 		// TODO: investigate filtering CurrentState by proximity/look direction/etc to client to save bandwidth
 		// TODO: Don't send inputs of actors/pawns not being controlled
-		MC_SendStateToClients(CurrentState, InputActorArray, InputArray);
+		if (tock) {
+			MC_SendStateToClients(CurrentState, InputActorArray, InputArray);
+			tock = false;
+		} else {
+			tock = true;
+		}
+		
 	} else // if client
 	{
 		StateHistory.Push(CurrentState);
@@ -84,13 +97,16 @@ void ATestActor::Tick(float DeltaTime)
 
 void ATestActor::SendInputToServer(AActor* actor, FTWPlayerInput input)
 {
-	// GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Yellow, FString::Printf(TEXT("recieved: %i"), true));
 	// If this actor doesn't have an input buffer yet, create one
 	if (!InputBuffers.Contains(actor))
 	{
-		InputBuffers.Add(actor, MakeUnique<TMpscQueue<FTWPlayerInput>>());
+		// Create a new buffer on the heap and store its pointer in the map
+		TWRingBuffer<FTWPlayerInput>* newBuffer = new TWRingBuffer<FTWPlayerInput>(64);
+		InputBuffers.Add(actor, newBuffer);
 	}
-	InputBuffers[actor]->Enqueue(input);
+    
+	// Access the pointer and use -> to call Push
+	InputBuffers[actor]->Push(input);
 }
 
 void ATestActor::MC_SendStateToClients_Implementation(FBulletSimulationState ServerState, const TArray<AActor*>& InputActors,
@@ -105,16 +121,27 @@ void ATestActor::MC_SendStateToClients_Implementation(FBulletSimulationState Ser
 		int framesToRewind = FMath::RoundToInt(TWPC->RoundTripDelay / FixedDeltaTime);
 		FBulletSimulationState HistoricState = StateHistory.Get(framesToRewind);
 
-		// for (auto& Pair : InterpDeltas)
-		// {
-		// 	if (Cast<ABasicPhysicsPawn>(Pair.Key)->mustCorrectState)
-		// 	{
-		// 		
-		// 	}
-		// }
+		// cache current state
+		CurrentState = GetCurrentState();
 		
-		SetLocalState(ServerState); // replace this with interpolation logic
-		// SetLocalStateDiscriminate(ServerState, HistoricState);
+		// set local state to server states for resim
+		for (const auto& objState : ServerState.ObjectStates)
+		{
+			if (ActorToBody.Contains(objState.Actor))
+			{
+				btRigidBody* body = ActorToBody[objState.Actor];
+
+				body->clearForces();
+				
+				body->setWorldTransform(BulletHelpers::ToBt(objState.Transform, GetActorLocation()));
+				body->setLinearVelocity(BulletHelpers::ToBtDir(objState.Velocity, true));
+				body->setAngularVelocity(BulletHelpers::ToBtDir(objState.AngularVelocity, true));
+			}
+			else
+			{
+				UE_LOG(LogTemp, Warning, TEXT("SetLocalState: Actor not found in ActorToBody map"));
+			}
+		}
 		
 		// simulate up to prediction
 		for (int i = 0; i < framesToRewind; i++)
@@ -124,7 +151,6 @@ void ATestActor::MC_SendStateToClients_Implementation(FBulletSimulationState Ser
 			// 	Cast<ABasicPhysicsPawn>(InputActors[j])->ApplyInputs(PlayerInputs[j]);
 			// }
 			
-			// apply local pawn's inputs
 			FTWPlayerInput PastInput = LocalInputBuffer.Get(framesToRewind-i);
 			LocalPawn->ApplyInputs(PastInput);
 			// GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Yellow, FString::Printf(TEXT("Got and applied input: %f, %f, %f"), PastInput.MovementInput.X, PastInput.MovementInput.Y, PastInput.MovementInput.Z));
@@ -134,7 +160,48 @@ void ATestActor::MC_SendStateToClients_Implementation(FBulletSimulationState Ser
 			StepPhysics(FixedDeltaTime, 1);
 		}
 		debugShouldResim = false;
-	
+		//
+		// // Reapply/interpolate states of objects that were "close enough"
+		// for (const auto& objState : CurrentState.ObjectStates)
+		// {
+		//     if (ActorToBody.Contains(objState.Actor))
+		//     {
+		//         // Find the corresponding state in ServerState
+		//         for (const auto& serverObjState : ServerState.ObjectStates)
+		//         {
+		//             if (serverObjState.Actor == objState.Actor)
+		//             {
+		//                 // Calculate the difference
+		//                 FBulletObjectState Diff = serverObjState - objState;
+		//                 
+		//                 // If small enough difference, interpolate
+		//                 if (Diff.Transform.GetLocation().Length() < 10.0f)
+		//                 {
+		//                     btRigidBody* body = ActorToBody[objState.Actor];
+		//                     
+		//                     // Simple 50/50 blend between current state and server state
+		//                     FVector blendedLocation = (objState.Transform.GetLocation() + serverObjState.Transform.GetLocation()) * 0.5f;
+		//                     FQuat currentQuat = objState.Transform.GetRotation();
+		//                     FQuat serverQuat = serverObjState.Transform.GetRotation();
+		//                     FQuat blendedQuat = FQuat::Slerp(currentQuat, serverQuat, 0.5f);
+		//                     
+		//                     FVector blendedVelocity = (objState.Velocity + serverObjState.Velocity) * 0.5f;
+		//                     FVector blendedAngularVelocity = (objState.AngularVelocity + serverObjState.AngularVelocity) * 0.5f;
+		//                     
+		//                     // Create blended transform
+		//                     FTransform blendedTransform(blendedQuat, blendedLocation, objState.Transform.GetScale3D());
+		//                     
+		//                     // Apply the blended state
+		//                     body->clearForces();
+		//                     body->setWorldTransform(BulletHelpers::ToBt(blendedTransform, GetActorLocation()));
+		//                     body->setLinearVelocity(BulletHelpers::ToBtDir(blendedVelocity, true));
+		//                     body->setAngularVelocity(BulletHelpers::ToBtDir(blendedAngularVelocity, true));
+		//                 }
+		//                 break;
+		//             }
+		//         }
+		//     }
+		// }
 	}
 }
 

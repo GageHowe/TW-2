@@ -94,50 +94,34 @@ struct FBulletSimulationState
 	double CurrentTime = 0;
 };
 
-/**
- * Converts a TMap to separate key and value arrays for RPC transmission
- * 
- * @param InMap - The map to convert
- * @param OutKeys - Array to store the keys
- * @param OutValues - Array to store the values
- */
+// Convert TMap to a pair of arrays
 template<typename KeyType, typename ValueType>
-	static void MapToArrays(const TMap<KeyType, ValueType>& InMap, TArray<KeyType>& OutKeys, TArray<ValueType>& OutValues)
+TPair<TArray<KeyType>, TArray<ValueType>> TMapToArrays(const TMap<KeyType, ValueType>& Map)
 {
-	const int32 ElementCount = InMap.Num();
-	OutKeys.Empty(ElementCount);
-	OutValues.Empty(ElementCount);
-        
-	for (const TPair<KeyType, ValueType>& Pair : InMap)
+	TArray<KeyType> OutKeys;
+	TArray<ValueType> OutValues;
+    
+	for (const TPair<KeyType, ValueType>& Pair : Map)
 	{
 		OutKeys.Add(Pair.Key);
 		OutValues.Add(Pair.Value);
 	}
-}
     
-/**
- * Converts separate key and value arrays back to a TMap after RPC transmission
- * 
- * @param InKeys - Array of keys
- * @param InValues - Array of values
- * @return TMap created from the arrays
- */
+	return TPair<TArray<KeyType>, TArray<ValueType>>(OutKeys, OutValues);
+}
+
+// Convert a pair of arrays back to TMap
 template<typename KeyType, typename ValueType>
-static TMap<KeyType, ValueType> ArraysToMap(const TArray<KeyType>& InKeys, const TArray<ValueType>& InValues)
+TMap<KeyType, ValueType> ArraysToTMap(const TArray<KeyType>& InKeys, const TArray<ValueType>& InValues)
 {
-	TMap<KeyType, ValueType> Result;
-        
-	const int32 KeyCount = InKeys.Num();
-	const int32 ValueCount = InValues.Num();
-	const int32 ElementCount = FMath::Min(KeyCount, ValueCount);
-        
-	Result.Reserve(ElementCount);
-        
-	for (int32 i = 0; i < ElementCount; ++i)
+	TMap<KeyType, ValueType> OutMap;
+    
+	const int32 Count = FMath::Min(InKeys.Num(), InValues.Num());
+	for (int32 i = 0; i < Count; ++i)
 	{
-		Result.Add(InKeys[i], InValues[i]);
+		OutMap.Add(InKeys[i], InValues[i]);
 	}
-        
-	return Result;
+    
+	return OutMap;
 }
 

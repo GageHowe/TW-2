@@ -15,9 +15,7 @@ public:
         : Capacity(InCapacity)
         , Size(0)
         , Head(0)
-    {
-        // No pre-allocation, we'll grow as needed
-    }
+    {}
 
     /** Add an element to the buffer */
     void Push(const T& Item)
