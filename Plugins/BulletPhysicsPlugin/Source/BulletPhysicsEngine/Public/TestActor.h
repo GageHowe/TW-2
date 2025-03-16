@@ -1,3 +1,5 @@
+// Fill out your copyright notice in the Description page of Project Settings.
+
 #pragma once
 
 #include "CoreMinimal.h"
@@ -10,269 +12,240 @@
 #include "ThirdParty/BulletPhysicsEngineLibrary/debug/btdebug.h"
 #include "Components/ShapeComponent.h"
 #include <functional>
+#include <queue>
+class ABasicPhysicsPawn; // forward declaration
+#include "BlueprintEditor.h"
+#include "HairStrandsInterface.h"
+#include "Engine/PackageMapClient.h"
 #include "GameFramework/Actor.h"
-#include "ControllableInterface.h"
 #include "Net/UnrealNetwork.h"
+#include "helpers.h"
+#include "GameFramework/GameSession.h"
+#include "GameFramework/PlayerState.h"
+#include "GameFramework/GameState.h"
+#include "TWRingBuffer.h"
 #include "TestActor.generated.h"
 
-USTRUCT(BlueprintType)
-struct BULLETPHYSICSENGINE_API Ftris
-{
-    GENERATED_BODY()
-    FVector a;
-    FVector b;
-    FVector c;
-    FVector d;
-};
-
-/**
- * Physics manager that handles Bullet physics simulation and networking
- * Implements client-side prediction and server reconciliation
- */
 UCLASS()
 class BULLETPHYSICSENGINE_API ATestActor : public AActor
 {
-    GENERATED_BODY()
-    
-public:    
-    // Sets default values for this actor's properties
-    ATestActor();
+	GENERATED_BODY()
+	
+public:	
+	ATestActor();
 
-    // Input buffers for each client
-    UPROPERTY()
-    TMap<int32, FInputBuffer> ClientInputBuffers;
-    
-    // State cache for reconciliation
-    UPROPERTY()
-    FStateCache StateCache;
-    
-    UPROPERTY(Blueprintable, BlueprintReadWrite, Category = "Physics Networking")
-    TMap<int32, int32> ServerIdToClientId; // Server to client ID mapping
-    
-    UPROPERTY(Blueprintable, BlueprintReadWrite, Category = "Physics Networking")
-    TMap<int32, int32> ClientIdToServerId; // Client to server ID mapping (client-side)
-    
-    FCriticalSection MapCriticalSection;
-    
-    // Current simulation state
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Physics Networking")
-    FBulletSimulationState CurrentState;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FBulletSimulationState CurrentState;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Physics Networking")
-    int32 CurrentFrameNumber = 0;    // Global current frame number
-    
-    // Set up by default to run at 60 FPS physics
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Physics Networking")
-    float FixedDeltaTime = 1.0f / 60.0f;
-    
-    // How many frames of buffer we want for client inputs - helps with jitter
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Physics Networking")
-    int32 TargetBufferSize = 3;
-    
-    // Flag to indicate we're reconciling
-    UPROPERTY()
-    bool bIsReconciling = false;
-    
-    // Last frame we reconciled at
-    UPROPERTY()
-    int32 LastReconcileFrame = -1;
-    
-    // Flag to enable debug visualization
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Physics Networking")
-    bool bDebugMode = false;
-    
-    // Bullet physics components
-    btCollisionConfiguration* BtCollisionConfig;
-    btCollisionDispatcher* BtCollisionDispatcher;
-    btBroadphaseInterface* BtBroadphase;
-    btConstraintSolver* BtConstraintSolver;
-    btDiscreteDynamicsWorld* BtWorld;
-    BulletHelpers* BulletHelpers;
-    BulletDebugDraw* btdebugdraw;
-    btStaticPlaneShape* plane;
-    btIDebugDraw* BtDebugDraw;
-    
-    TArray<btRigidBody*> BtRigidBodies;
-    FCriticalSection BtCriticalSection;
-    
-    TArray<btCollisionObject*> BtStaticObjects;
-    btCollisionObject* procbody;
-    TArray<btBoxShape*> BtBoxCollisionShapes;
-    TArray<btSphereShape*> BtSphereCollisionShapes;
-    TArray<btCapsuleShape*> BtCapsuleCollisionShapes;
-    btSequentialImpulseConstraintSolver* mt;
-    
-    struct ConvexHullShapeHolder
-    {
-        UBodySetup* BodySetup;
-        int HullIndex;
-        FVector Scale;
-        btConvexHullShape* Shape;
-    };
-    TArray<ConvexHullShapeHolder> BtConvexHullCollisionShapes;
-    
-    struct CachedDynamicShapeData
-    {
-        FName ClassName;
-        btCollisionShape* Shape;
-        bool bIsCompound;
-        btScalar Mass;
-        btVector3 Inertia;
-    };
-    TArray<CachedDynamicShapeData> CachedDynamicShapes;
+	// Server-only state buffer
+	// UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TWRingBuffer<FBulletSimulationState> StateHistory;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	ABasicPhysicsPawn* LocalPawn; // this is set on PossessedBy
 
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Bullet Physics|Objects")
-    TArray<AActor*> PhysicsStaticActors1;
-    
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Bullet Physics|Objects")
-    TArray<AActor*> DynamicActors;
-    
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Bullet Physics|Objects")
-    float PhysicsStatic1Friction = 0.6f;
-    
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Bullet Physics|Objects")
-    float PhysicsStatic1Restitution = 0.3f;
-    
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Bullet Physics|Objects")
-    float randvar;
+	bool tock = false;
+
+	// Frames
+	// UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	// int32 CurrentFrameNumber = 0;	// Global current frame number
+	const float FixedDeltaTime = 1.0f / 60.0f;
+
+	bool debugShouldResim = false;
+	UFUNCTION(Server, Reliable)
+	void SR_debugResim();
+
+	// bidirectional map to manage an actor's rigidbody
+	TMap<btRigidBody*, AActor*> BodyToActor;
+	TMap<AActor*, btRigidBody*> ActorToBody;
+
+	// the error clients must correct over an interpolation period
+	// should go down to zero, which means no error
+	TMap<AActor*, FBulletObjectState> InterpDeltas;
+	
+	// server's list of input Cbuffers for each pawn
+	// TMap<AActor*, TSharedPtr<TMpscQueue<FTWPlayerInput>>> InputBuffers;
+	TMap<AActor*, TWRingBuffer<FTWPlayerInput>*> InputBuffers;
+	
+	TWRingBuffer<FTWPlayerInput> LocalInputBuffer = TWRingBuffer<FTWPlayerInput>(64);
+
+	FBulletObjectState* InterpolationError;
+	
+	virtual void GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const override;
+
+	UFUNCTION()
+	void SendInputToServer(AActor* actor, FTWPlayerInput input);
+
+	UFUNCTION(BlueprintCallable)
+	FBulletSimulationState GetCurrentState() const
+	{
+		FBulletSimulationState thisState;
+		// thisState.FrameNumber = CurrentFrameNumber;
+		thisState.CurrentTime = GetWorld()->GetTimeSeconds();
+		// construct and add all object states
+		for (const auto& tuple : BodyToActor)
+		{
+			FBulletObjectState os;
+			btRigidBody* body = tuple.Key;
+			os.Actor = tuple.Value;
+			os.Transform = BulletHelpers::ToUE(body->getWorldTransform(), GetActorLocation());
+			os.Velocity = BulletHelpers::ToUEDir(body->getLinearVelocity(), true);
+			os.AngularVelocity = BulletHelpers::ToUEDir(body->getAngularVelocity(), true);
+	
+			thisState.ObjectStates.Add(os);
+		}
+		return thisState;
+	}
+	
+	void SetLocalState(FBulletSimulationState ServerState)
+	{
+		if (HasAuthority()) {
+			GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Yellow, TEXT("Tried to run SetLocalState on server"));
+			return;
+		} else {
+
+			for (const auto& objState : ServerState.ObjectStates)
+			{
+				if (ActorToBody.Contains(objState.Actor))
+				{
+					btRigidBody* body = ActorToBody[objState.Actor];
+
+					body->clearForces();
+					
+					body->setWorldTransform(BulletHelpers::ToBt(objState.Transform, GetActorLocation()));
+					body->setLinearVelocity(BulletHelpers::ToBtDir(objState.Velocity, true));
+					body->setAngularVelocity(BulletHelpers::ToBtDir(objState.AngularVelocity, true));
+				}
+				else
+				{
+					UE_LOG(LogTemp, Warning, TEXT("SetLocalState: Actor not found in ActorToBody map"));
+				}
+			}
+		}
+	}
+
+	// send state and actors' last input
+	UFUNCTION(BlueprintCallable, NetMulticast, Unreliable)
+	void MC_SendStateToClients(FBulletSimulationState ServerState, const TArray<AActor*>& InputActors, const TArray<FTWPlayerInput>& PlayerInputs);
+
+	// Global objects
+	btCollisionConfiguration* BtCollisionConfig;
+	btCollisionDispatcher* BtCollisionDispatcher;
+	btBroadphaseInterface* BtBroadphase;
+	btConstraintSolver* BtConstraintSolver;
+	btDiscreteDynamicsWorld* BtWorld;
+	BulletHelpers* BulletHelpers;
+	BulletDebugDraw* btdebugdraw;
+	btStaticPlaneShape* plane;
+	// Custom debug interface
+	btIDebugDraw* BtDebugDraw;
+	// Dynamic bodies
+	TArray<btRigidBody*> BtRigidBodies;
+	// Static colliders
+	TArray<btCollisionObject*> BtStaticObjects;
+	btCollisionObject* procbody;
+	// Re-usable collision shapes
+	TArray<btBoxShape*> BtBoxCollisionShapes;
+	TArray<btSphereShape*> BtSphereCollisionShapes;
+	TArray<btCapsuleShape*> BtCapsuleCollisionShapes;
+	btSequentialImpulseConstraintSolver* mt;
+	struct ConvexHullShapeHolder
+	{
+		UBodySetup* BodySetup;
+		int HullIndex;
+		FVector Scale;
+		btConvexHullShape* Shape;
+	};
+	TArray<ConvexHullShapeHolder> BtConvexHullCollisionShapes;
+	struct CachedDynamicShapeData
+	{
+		FName ClassName;
+		btCollisionShape* Shape;
+		bool bIsCompound;
+		btScalar Mass;
+		btVector3 Inertia;
+	};
+	TArray<CachedDynamicShapeData> CachedDynamicShapes;
+
+	// This list can be edited in the level, linking to placed static actors
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Bullet Physics|Objects")
+	TArray<AActor*> PhysicsStaticActors1;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Bullet Physics|Objects")
+	TArray<AActor*> DynamicActors;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Bullet Physics|Objects")
+	FString text="ra";
+	// These properties can only be edited in the Blueprint
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Bullet Physics|Objects")
+	float PhysicsStatic1Friction = 0.6;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Bullet Physics|Objects")
+	float PhysicsStatic1Restitution = 0.3;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Bullet Physics|Objects")
+	float randvar;
 
 protected:
-    virtual void BeginPlay() override;
-    
-    // Tick accumulator for fixed timestep
-    float PhysicsAccumulator = 0.0f;
+	virtual void BeginPlay() override;
+public:	
+	virtual void Tick(float DeltaTime) override;
 
-public:    
-    virtual void Tick(float DeltaTime) override;
+	// use this to completely remove the body and references to it
+	// E.g. when destroying an actor
+	void DestroyRigidBody(btRigidBody* rigidbody)
+	{
 
-    // Bullet physics setup methods
-    UFUNCTION(BlueprintCallable, Category = "Bullet Physics")
-    void SetupStaticGeometryPhysics(TArray<AActor*> Actors, float Friction, float Restitution);
-    
-    UFUNCTION(BlueprintCallable, Category = "Bullet Physics")
-    void AddStaticBody(AActor* Actor, float Friction, float Restitution, int &ID);
-    
-    UFUNCTION(BlueprintCallable, Category = "Bullet Physics")
-    void AddProcBody(AActor* Body, float Friction, TArray<FVector> a, TArray<FVector> b, TArray<FVector> c, TArray<FVector> d, float Restitution, int& ID);
-    
-    UFUNCTION(BlueprintCallable, Category = "Bullet Physics")
-    void UpdateProcBody(AActor* Body, float Friction, TArray<FVector> a, TArray<FVector> b, TArray<FVector> c, TArray<FVector> d, float Restitution, int& ID, int PrevID);
-    
-    // Add a dynamic rigid body
-    UFUNCTION(BlueprintCallable, Category = "Bullet Physics")
-    void AddRigidBody(AActor* Body, float Friction, float Restitution, int& ID, float Mass);
-    
-    UFUNCTION(BlueprintCallable, Category = "Bullet Physics")
-    void UpdatePlayertransform(AActor* Player, int ID);
-    
-    UFUNCTION(BlueprintCallable, Category = "Bullet Physics")
-    void AddImpulse(int ID, FVector Impulse, FVector Location);
-    
-    typedef const std::function<void(btCollisionShape* /*SingleShape*/, const FTransform& /*RelativeXform*/)>& PhysicsGeometryCallback;
-    
-    UFUNCTION(BlueprintCallable, Category = "Bullet Physics")
-    void AddForce(int ID, FVector Force, FVector Location);
-    
-    UFUNCTION(BlueprintCallable, Category = "Bullet Physics")
-    void AddCentralForce(int ID, FVector Force);
-    
-    UFUNCTION(BlueprintCallable, Category = "Bullet Physics")
-    void AddTorque(int ID, FVector Torque);
-    
-    UFUNCTION(BlueprintCallable, Category = "Bullet Physics")
-    void AddTorqueImpulse(int ID, FVector Torque);
-    
-    void ExtractPhysicsGeometry(AActor* Actor, PhysicsGeometryCallback CB);
-    btCollisionObject* AddStaticCollision(btCollisionShape* Shape, const FTransform& Transform, float Friction, float Restitution, AActor* Actor);
-    void ExtractPhysicsGeometry(UStaticMeshComponent* SMC, const FTransform& InvActorXform, PhysicsGeometryCallback CB);
-    void ExtractPhysicsGeometry(UShapeComponent* Sc, const FTransform& InvActorXform, PhysicsGeometryCallback CB);
-    void ExtractPhysicsGeometry(const FTransform& XformSoFar, UBodySetup* BodySetup, PhysicsGeometryCallback CB);
-    btCollisionShape* GetBoxCollisionShape(const FVector& Dimensions);
-    btCollisionShape* GetSphereCollisionShape(float Radius);
-    btCollisionShape* GetCapsuleCollisionShape(float Radius, float Height);
-    btCollisionShape* GetTriangleMeshShape(TArray<FVector> a, TArray<FVector> b, TArray<FVector> c, TArray<FVector> d);
-    btCollisionShape* GetConvexHullCollisionShape(UBodySetup* BodySetup, int ConvexIndex, const FVector& Scale);
-    const ATestActor::CachedDynamicShapeData& GetCachedDynamicShapeData(AActor* Actor, float Mass);
-    btRigidBody* AddRigidBody(AActor* Actor, const ATestActor::CachedDynamicShapeData& ShapeData, float Friction, float Restitution);
-    btRigidBody* AddRigidBody(AActor* Actor, btCollisionShape* CollisionShape, btVector3 Inertia, float Mass, float Friction, float Restitution);
-    
-    UFUNCTION(BlueprintCallable, Category = "Bullet Physics")
-    void StepPhysics(float DeltaSeconds, int Substeps);
-    
-    UFUNCTION(BlueprintCallable, Category = "Bullet Physics")
-    void SetPhysicsState(int ID, FTransform Transforms, FVector Velocity, FVector AngularVelocity, FVector& Force);
-    
-    UFUNCTION(BlueprintCallable, Category = "Bullet Physics")
-    void GetPhysicsState(int ID, FTransform& Transforms, FVector& Velocity, FVector& AngularVelocity, FVector& Force);
-    
-    UFUNCTION(BlueprintCallable, Category = "Bullet Physics")
-    void GetVelocityAtLocation(int ID, FVector Location, FVector& Velocity);
-    
-    UFUNCTION(BlueprintCallable, Category = "Bullet Physics")
-    void ResetSim();
-
-    // NETWORKING FUNCTIONS
-    
-    // Record current state for reconciliation
-    UFUNCTION(BlueprintCallable, Category = "Physics Networking")
-    void RecordState();
-    
-    // Get current simulation state
-    UFUNCTION(BlueprintCallable, Category = "Physics Networking")
-    FBulletSimulationState GetCurrentState();
-    
-    // Send state to clients
-    UFUNCTION(NetMulticast, Reliable, BlueprintCallable, Category = "Physics Networking")
-    void MC_SendStateToClients(FBulletSimulationState ServerState);
-    
-    // Step physics for multiple frames
-    UFUNCTION(BlueprintCallable, Category = "Physics Networking")
-    void StepPhysicsXFrames(int32 FrameCount)
-    {
-        for (int32 i = 0; i < FrameCount; i++)
-        {
-            StepPhysics(FixedDeltaTime, 0);
-            CurrentFrameNumber++;
-        }
-    }
-    
-    // Process client input
-    UFUNCTION(BlueprintCallable, Category = "Physics Networking")
-    void ProcessClientInput(const FBulletPlayerInput& Input);
-    
-    // Apply input to object
-    UFUNCTION(BlueprintCallable, Category = "Physics Networking")
-    void ApplyInput(const FBulletPlayerInput& Input);
-    
-    // Client sends input to server
-    UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Physics Networking")
-    void Server_SendInput(const TArray<FBulletPlayerInput>& Inputs);
-    
-    // Server reconciles client state
-    UFUNCTION(BlueprintCallable, Category = "Physics Networking")
-    void ReconcileState(const FBulletSimulationState& ServerState);
-    
-    // Enqueue client input
-    UFUNCTION(BlueprintCallable, Category = "Physics Networking")
-    void EnqueueInput(const FBulletPlayerInput& Input, int32 ClientID);
-    
-    // Get estimated ping in frames
-    UFUNCTION(BlueprintCallable, Category = "Physics Networking")
-    int32 GetPingInFrames();
-    
-    // Compress inputs before sending to reduce bandwidth
-    UFUNCTION(BlueprintCallable, Category = "Physics Networking")
-    TArray<FBulletPlayerInput> CompressInputs(const TArray<FBulletPlayerInput>& Inputs);
-    
-    // Decompress inputs received from network
-    UFUNCTION(BlueprintCallable, Category = "Physics Networking")
-    TArray<FBulletPlayerInput> DecompressInputs(const TArray<FBulletPlayerInput>& CompressedInputs);
-    
-    // Get snapshot of buffered inputs (for debugging)
-    UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Physics Networking")
-    TArray<FBulletPlayerInput> GetBufferedInputs(int32 ClientID, int32 MaxCount = 10);
-    
-    // Get serializable simulation state
-    UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Physics Networking")
-    FBulletSimulationState GetSerializableState();
+		BodyToActor.Remove(rigidbody);
+		ActorToBody.Remove(*BodyToActor.Find(rigidbody));
+		BtWorld->removeRigidBody(rigidbody);
+	}
+	
+	// THESE FUNCTIONS ARE PART OF THE API AND LARGELY SHOULDN'T BE TOUCHED
+	void SetupStaticGeometryPhysics(TArray<AActor*> Actors, float Friction, float Restitution);
+	UFUNCTION(BlueprintCallable)
+	void AddStaticBody(AActor* player, float Friction, float Restitution,int &ID);
+	UFUNCTION(BlueprintCallable)
+	void AddProcBody(AActor* Body,  float Friction, TArray<FVector> a, TArray<FVector> b, TArray<FVector> c, TArray<FVector> d, float Restitution, int& ID);
+	UFUNCTION(BlueprintCallable)
+	void UpdateProcBody(AActor* Body, float Friction, TArray<FVector> a, TArray<FVector> b, TArray<FVector> c, TArray<FVector> d, float Restitution, int& ID, int PrevID);
+	UFUNCTION(BlueprintCallable)
+	void AddRigidBody(AActor* Body, float Friction, float Restitution,float mass);
+	// new function, no ufunction macro because btRigidBody can't be in BP
+	btRigidBody* AddRigidBodyAndReturn(AActor* Body, float Friction, float Restitution, float mass);
+	UFUNCTION(BlueprintCallable)
+	void UpdatePlayertransform(AActor* player, int ID);
+	UFUNCTION(BlueprintCallable)
+	void AddImpulse( int ID, FVector Impulse, FVector Location);
+	typedef const std::function<void(btCollisionShape* /*SingleShape*/, const FTransform& /*RelativeXform*/)>& PhysicsGeometryCallback;
+	UFUNCTION(BlueprintCallable)
+	void AddForce(int ID, FVector Force, FVector Location);
+	UFUNCTION(BlueprintCallable)
+	void AddCentralForce(int ID, FVector Force);
+	UFUNCTION(BlueprintCallable)
+	void AddTorque(int ID, FVector Torque);
+	UFUNCTION(BlueprintCallable)
+	void AddTorqueImpulse(int ID, FVector Torque);
+	typedef const std::function<void(btCollisionShape* /*SingleShape*/, const FTransform& /*RelativeXform*/)>& PhysicsGeometryCallback;
+	void ExtractPhysicsGeometry(AActor* Actor, PhysicsGeometryCallback CB);
+	btCollisionObject* AddStaticCollision(btCollisionShape* Shape, const FTransform& Transform, float Friction, float Restitution, AActor* Actor);
+	void ExtractPhysicsGeometry(UStaticMeshComponent* SMC, const FTransform& InvActorXform, PhysicsGeometryCallback CB);
+	void ExtractPhysicsGeometry(UShapeComponent* Sc, const FTransform& InvActorXform, PhysicsGeometryCallback CB);
+	void ExtractPhysicsGeometry(const FTransform& XformSoFar, UBodySetup* BodySetup, PhysicsGeometryCallback CB);
+	btCollisionShape* GetBoxCollisionShape(const FVector& Dimensions);
+	btCollisionShape* GetSphereCollisionShape(float Radius);
+	btCollisionShape* GetCapsuleCollisionShape(float Radius, float Height);
+	btCollisionShape* GetTriangleMeshShape(TArray<FVector> a, TArray<FVector> b, TArray<FVector> c, TArray<FVector> d);
+	btCollisionShape* GetConvexHullCollisionShape(UBodySetup* BodySetup, int ConvexIndex, const FVector& Scale);
+	const ATestActor::CachedDynamicShapeData& GetCachedDynamicShapeData(AActor* Actor, float Mass);
+	btRigidBody* AddRigidBody(AActor* Actor, const ATestActor::CachedDynamicShapeData& ShapeData, float Friction, float Restitution);
+	btRigidBody* AddRigidBody(AActor* Actor, btCollisionShape* CollisionShape, btVector3 Inertia, float Mass, float Friction, float Restitution);
+	UFUNCTION(BlueprintCallable)
+	void StepPhysics(float DeltaSeconds, int substeps);
+	UFUNCTION(BlueprintCallable)
+	void SetPhysicsState(int ID, FTransform transforms, FVector Velocity, FVector AngularVelocity,FVector& Force);
+	UFUNCTION(BlueprintCallable)
+	void GetPhysicsState(int ID, FTransform& transforms, FVector& Velocity, FVector& AngularVelocity, FVector& Force);
+	UFUNCTION(BlueprintCallable)
+	void GetVelocityAtLocation(int ID, FVector Location, FVector& Velocity);
+	UFUNCTION(BlueprintCallable)
+	void ResetSim();
 };
+
+

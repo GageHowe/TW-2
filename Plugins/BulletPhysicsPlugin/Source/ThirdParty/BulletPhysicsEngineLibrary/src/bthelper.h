@@ -29,7 +29,6 @@ public:
 	{
 		return FVector(V.x(), V.y(), V.z()) * BULLET_TO_WORLD_SCALE + WorldOrigin;
 	}
-	// this is used with locations
 	static btVector3 ToBtPos(const FVector& V, const FVector& WorldOrigin)
 	{
 		return btVector3(V.X - WorldOrigin.X, V.Y - WorldOrigin.Y, V.Z - WorldOrigin.Z) * WORLD_TO_BULLET_SCALE;
@@ -41,7 +40,6 @@ public:
 		else
 			return FVector(V.x(), V.y(), V.z());
 	}
-	// this is used with force, velocity, and angular velocity
 	static btVector3 ToBtDir(const FVector& V, bool AdjustScale = true)
 	{
 		if (AdjustScale)
@@ -72,7 +70,6 @@ public:
 		const FVector Pos = ToUEPos(T.getOrigin(), WorldOrigin);
 		return FTransform(Rot, Pos);
 	}
-	// for locations and rotations, hell yeah
 	static btTransform ToBt(const FTransform& T, const FVector& WorldOrigin)
 	{
 		return btTransform(
