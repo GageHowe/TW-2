@@ -43,7 +43,7 @@ public:
 	bool IsPossessed = true;
 
 	UFUNCTION()
-	void ApplyInputs(const FTWPlayerInput& input) const;
+	virtual void ApplyInputs(const FTWPlayerInput& input) const; // virtual keyword needs to be present to make a function overridable
 	void EnableDebug();
 	
 	UFUNCTION(Server, Reliable)
@@ -68,17 +68,9 @@ protected:
 	void SetUpInput(float Value) { CurrentDirectionalInput.Z = Value; }
 	void EnableBoost() { CurrentBoostInput = true; }
 	void DisableBoost() { CurrentBoostInput = false; }
-	void SetTurnRightInput(float Val)
-	{ CurrentTurnRight = FMath::Clamp(FMath::RoundToInt(Val * 127.0f), -127, 127); }
-	void SetTurnUpInput(float Val)
-	{ CurrentTurnUp = FMath::Clamp(FMath::RoundToInt(Val * 127.0f), -127, 127); }
-
-	void Interpolate()
-	{
-		if (auto x = BulletWorld->InterpolationError)
-		{
-			// x.
-		}
-	}
+	// void SetTurnRightInput(float Val)
+	// { CurrentTurnRight = FMath::Clamp(FMath::RoundToInt(Val * 127.0f), -127, 127); }
+	// void SetTurnUpInput(float Val)
+	// { CurrentTurnUp = FMath::Clamp(FMath::RoundToInt(Val * 127.0f), -127, 127); }
 };
 

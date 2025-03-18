@@ -29,7 +29,7 @@ void ATestActor::BeginPlay()
 	mt->setRandSeed(1234);
 	BtConstraintSolver = mt;
 	BtWorld = new btDiscreteDynamicsWorld(BtCollisionDispatcher, BtBroadphase, BtConstraintSolver, BtCollisionConfig);
-	BtWorld->setGravity(btVector3(0, 0, -9.8));
+	BtWorld->setGravity(btVector3(0, 0, 0));
 	
 	// Gravity vector in our units (1=1cm)
 	//getSimulationIslandManager()->setSplitIslands(false);
@@ -712,7 +712,7 @@ void ATestActor::ResetSim()
 	}
 	
 	BtWorld = new btDiscreteDynamicsWorld(BtCollisionDispatcher, BtBroadphase, BtConstraintSolver, BtCollisionConfig);
-	BtWorld->setGravity(btVector3(0, 0, -9.8));
+	BtWorld->setGravity(btVector3(0, 0, 0));
 	BtBroadphase->resetPool(BtCollisionDispatcher);
 	BtConstraintSolver->reset();
 	for (int i = 0; i < BtRigidBodies.Num(); i++)

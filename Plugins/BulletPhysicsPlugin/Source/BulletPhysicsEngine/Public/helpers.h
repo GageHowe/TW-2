@@ -26,6 +26,9 @@ struct FTWPlayerInput
 	UPROPERTY(BlueprintReadWrite) // move this to int8s or bools for bandwidth
 	FVector MovementInput = {0,0,0}; // 0-1 on all axes, in local space
 
+	UPROPERTY(BlueprintReadWrite)
+	FRotator RotationInput = {0,0,0};
+
 	UPROPERTY()
 	int8 TurnRight = 0;
 	UPROPERTY()

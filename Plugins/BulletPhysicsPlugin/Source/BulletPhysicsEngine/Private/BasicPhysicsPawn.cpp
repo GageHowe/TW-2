@@ -4,6 +4,7 @@
 #include "Net/UnrealNetwork.h"
 #include "Kismet/GameplayStatics.h"
 #include "TWPlayerController.h"
+#include "GameFramework/SpringArmComponent.h"
 
 ABasicPhysicsPawn::ABasicPhysicsPawn()
 {
@@ -13,8 +14,15 @@ ABasicPhysicsPawn::ABasicPhysicsPawn()
 	
 	StaticMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("PlayerMesh"));
 	RootComponent = StaticMesh;
-	Camera = CreateDefaultSubobject<UCameraComponent>(TEXT("PlayerCamera"));
-	Camera->SetupAttachment(StaticMesh);
+
+	USpringArmComponent* SpringArm = CreateDefaultSubobject<USpringArmComponent>(TEXT("SpringArm"));
+	SpringArm->bUsePawnControlRotation = true;
+	SpringArm->SetupAttachment(RootComponent);
+	
+	Camera = CreateDefaultSubobject<UCameraComponent>(TEXT("Player"));
+	Camera->bUsePawnControlRotation = false; // idk what this does
+	Camera->SetupAttachment(SpringArm);
+	
 	SpawnCollisionHandlingMethod = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
 
 	// SetReplicates(true);
@@ -52,26 +60,19 @@ void ABasicPhysicsPawn::Tick(float DeltaTime)
 	Super::Tick(DeltaTime);
 	if (IsLocallyControlled())
 	{
-		// construct input and add to local buffer
 		FTWPlayerInput input = FTWPlayerInput();
 		input.MovementInput = CurrentDirectionalInput;
-		input.TurnRight = CurrentTurnRight;    // Add turn input
-		input.TurnUp = CurrentTurnUp;          // Add turn input
-		input.BoostInput = CurrentBoostInput;  // Assuming you have this variable
+		input.TurnRight = CurrentTurnRight;
+		input.TurnUp = CurrentTurnUp;
+		input.BoostInput = CurrentBoostInput;
+		input.RotationInput = GetControlRotation();
 		BulletWorld->LocalInputBuffer.Push(input);
-		// GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Yellow, FString::Printf(TEXT("Pushed input: %f, %f, %f"), input.MovementInput.X, input.MovementInput.Y, input.MovementInput.Z));
-		// UE_LOG(LogTemp, Warning, TEXT("Pushed input: %f, %f, %f"), input.MovementInput.X, input.MovementInput.Y, input.MovementInput.Z );
 		ApplyInputs(input);
 		if (!HasAuthority()) {SendInputsToServer(this, input);} // edge case, don't process inputs twice if listen server
 	}
-
-	// world timer
-	// double x = GetWorld()->GetGameState()->GetServerWorldTimeSeconds();
-	// GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Yellow, 
-	// FString::Printf(TEXT("time: %f"), x));
 }
 
-// right now, this just accelerates the pawn, but that's fine for now
+// override this function when creating children
 void ABasicPhysicsPawn::ApplyInputs(const FTWPlayerInput& input) const
 {
 	// movement force
@@ -95,12 +96,14 @@ void ABasicPhysicsPawn::ApplyInputs(const FTWPlayerInput& input) const
         
 		// Create rotation quaternions for each axis
 		btQuaternion yawRotation(btVector3(0, 0, 1), turnRightRad);  // Z-axis rotation
-		btQuaternion pitchRotation(btVector3(1, 0, 0), turnUpRad);   // X-axis rotation
+		btQuaternion pitchRotation(btVector3(0, -1, 0), turnUpRad);   // X-axis rotation
         
 		// Apply rotations in sequence (order matters!)
 		// Typically yaw (right) then pitch (up)
 		btQuaternion newRotation = yawRotation * currentRotation * pitchRotation;
 		newRotation.normalize();
+
+		// MyRigidBody->applyTorque(btQuaternion(newRotation));
         
 		// Update the transform with new rotation while keeping position
 		currentTransform.setRotation(newRotation);
@@ -155,9 +158,15 @@ void ABasicPhysicsPawn::SetupPlayerInputComponent(class UInputComponent* ThisInp
 
 	InputComponent->BindAction(TEXT("Boost"), IE_Pressed, this, &ABasicPhysicsPawn::EnableBoost);
 	InputComponent->BindAction(TEXT("Boost"), IE_Released, this, &ABasicPhysicsPawn::DisableBoost);
-	
-	InputComponent->BindAxis(TEXT("LookRight"), this, &ABasicPhysicsPawn::SetTurnRightInput);
-	InputComponent->BindAxis(TEXT("LookUp"), this, &ABasicPhysicsPawn::SetTurnUpInput);
+
+	// no longer are we directly controlling the pawn with the input
+	// InputComponent->BindAxis(TEXT("LookRight"), this, &ABasicPhysicsPawn::SetTurnRightInput);
+	// InputComponent->BindAxis(TEXT("LookUp"), this, &ABasicPhysicsPawn::SetTurnUpInput);
+
+	// camera free look
+	InputComponent->BindAxis("LookUp", this, &APawn::AddControllerPitchInput);
+	InputComponent->BindAxis("LookRight", this, &APawn::AddControllerYawInput);
+    
 }
 
 void ABasicPhysicsPawn::EnableDebug()
