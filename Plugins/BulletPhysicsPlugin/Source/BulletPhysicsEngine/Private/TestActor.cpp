@@ -12,9 +12,11 @@
 ATestActor::ATestActor()
 {
 	PrimaryActorTick.bCanEverTick = true;
+	bAsyncPhysicsTickEnabled = true;
 	bReplicates = true;
 	bAlwaysRelevant = true;
 	bOnlyRelevantToOwner = false;
+	SetReplicatingMovement(false);
 }
 
 // Called when the game starts or when spawned
@@ -39,6 +41,14 @@ void ATestActor::BeginPlay()
 void ATestActor::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
+	// Dep. Physics networking logic is now in async physics tick
+}
+
+void ATestActor::AsyncPhysicsTickActor(float DeltaTime, float SimTime)
+{
+	
+	Super::AsyncPhysicsTickActor(DeltaTime, SimTime);
+
 	StepPhysics(DeltaTime, 1);
 	randvar = mt->getRandSeed();
 	CurrentState = GetCurrentState();
@@ -94,6 +104,7 @@ void ATestActor::Tick(float DeltaTime)
 		StateHistory.Push(CurrentState);
 	}
 }
+
 
 void ATestActor::SendInputToServer(AActor* actor, FTWPlayerInput input)
 {

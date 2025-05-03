@@ -9,6 +9,7 @@
 ABasicPhysicsPawn::ABasicPhysicsPawn()
 {
 	PrimaryActorTick.bCanEverTick = true;
+	bAsyncPhysicsTickEnabled = true;
 	bReplicates = true;
 	SetReplicatingMovement(false);
 	
@@ -16,7 +17,7 @@ ABasicPhysicsPawn::ABasicPhysicsPawn()
 	RootComponent = StaticMesh;
 
 	USpringArmComponent* SpringArm = CreateDefaultSubobject<USpringArmComponent>(TEXT("SpringArm"));
-	SpringArm->bUsePawnControlRotation = true;
+	SpringArm->bUsePawnControlRotation = false; // changed
 	SpringArm->SetupAttachment(RootComponent);
 	
 	Camera = CreateDefaultSubobject<UCameraComponent>(TEXT("Player"));
@@ -58,6 +59,13 @@ void ABasicPhysicsPawn::BeginPlay()
 void ABasicPhysicsPawn::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
+	// physics and movement handling moved to async physics tick
+}
+
+void ABasicPhysicsPawn::AsyncPhysicsTickActor(float DeltaTime, float SimTime)
+{
+	Super::AsyncPhysicsTickActor(DeltaTime, SimTime);
+	
 	if (IsLocallyControlled())
 	{
 		FTWPlayerInput input = FTWPlayerInput();

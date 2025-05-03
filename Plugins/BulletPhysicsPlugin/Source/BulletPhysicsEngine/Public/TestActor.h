@@ -44,7 +44,7 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	ABasicPhysicsPawn* LocalPawn; // this is set on PossessedBy
 
-	bool tock = false;
+	bool tock = false; // for syncing the 
 
 	// Frames
 	// UPROPERTY(EditAnywhere, BlueprintReadWrite)
@@ -186,6 +186,7 @@ protected:
 	virtual void BeginPlay() override;
 public:	
 	virtual void Tick(float DeltaTime) override;
+	virtual void AsyncPhysicsTickActor(float DeltaTime, float SimTime) override;
 
 	// use this to completely remove the body and references to it
 	// E.g. when destroying an actor

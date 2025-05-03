@@ -17,6 +17,7 @@ class BULLETPHYSICSENGINE_API ABasicPhysicsPawn : public APawn
 public:
 	ABasicPhysicsPawn();
 	virtual void Tick(float DeltaTime) override;
+	virtual void AsyncPhysicsTickActor(float DeltaTime, float SimTime) override;
 	virtual void SetupPlayerInputComponent(class UInputComponent* InputComponent) override;
 	virtual void BeginPlay() override;
 	virtual void GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const override;
