@@ -17,7 +17,7 @@ ABasicPhysicsPawn::ABasicPhysicsPawn()
 	RootComponent = StaticMesh;
 
 	USpringArmComponent* SpringArm = CreateDefaultSubobject<USpringArmComponent>(TEXT("SpringArm"));
-	SpringArm->bUsePawnControlRotation = false; // changed
+	SpringArm->bUsePawnControlRotation = true; // changed
 	SpringArm->SetupAttachment(RootComponent);
 	
 	Camera = CreateDefaultSubobject<UCameraComponent>(TEXT("Player"));
@@ -161,8 +161,6 @@ void ABasicPhysicsPawn::SetupPlayerInputComponent(class UInputComponent* ThisInp
 	InputComponent->BindAxis(TEXT("MoveForward"), this, &ABasicPhysicsPawn::SetForwardInput);
 	InputComponent->BindAxis(TEXT("MoveRight"), this, &ABasicPhysicsPawn::SetRightInput);
 	InputComponent->BindAxis(TEXT("MoveUp"), this, &ABasicPhysicsPawn::SetUpInput);
-	
-	InputComponent->BindAction(TEXT("Interact"), IE_Pressed, this, &ABasicPhysicsPawn::EnableDebug);
 
 	InputComponent->BindAction(TEXT("Boost"), IE_Pressed, this, &ABasicPhysicsPawn::EnableBoost);
 	InputComponent->BindAction(TEXT("Boost"), IE_Released, this, &ABasicPhysicsPawn::DisableBoost);
@@ -175,27 +173,6 @@ void ABasicPhysicsPawn::SetupPlayerInputComponent(class UInputComponent* ThisInp
 	InputComponent->BindAxis("LookUp", this, &APawn::AddControllerPitchInput);
 	InputComponent->BindAxis("LookRight", this, &APawn::AddControllerYawInput);
     
-}
-
-void ABasicPhysicsPawn::EnableDebug()
-{
-	// if (GetController())
-	// {
-	// 	GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Yellow, 
-	// 		FString::Printf(TEXT("Controller: %s"), *GetController()->GetName()));
-	// }
-	// else
-	// {
-	// 	GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Yellow, TEXT("No Controller!"));
-	// }
-	//
-	// if (auto pc = Cast<ATWPlayerController>(GetController()))
-	// {
-	// 	GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Yellow, TEXT("Correct Player Controller Found"));
-	// 	pc->SyncTimeWithServer();
-	// }
-
-	// BulletWorld->debugShouldResim = true;
 }
 
 void ABasicPhysicsPawn::SendInputsToServer_Implementation(AActor* actor, FTWPlayerInput input)

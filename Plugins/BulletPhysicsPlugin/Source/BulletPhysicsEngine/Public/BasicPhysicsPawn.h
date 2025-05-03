@@ -5,9 +5,6 @@
 #include "Camera/CameraComponent.h"
 #include "GameFramework/Pawn.h"
 #include "helpers.h"
-#include "bthelper.h"
-#include "Net/UnrealNetwork.h"
-#include "TWRingBuffer.h"
 #include "BasicPhysicsPawn.generated.h"
 
 UCLASS()
@@ -37,7 +34,8 @@ public:
 	
 	UPROPERTY(EditAnywhere)
 	ATestActor* BulletWorld = nullptr;
-	
+
+	// DEPRECATED MAYBE
 	// this is marked false when the pawn should not send or receive input
 	// i.e. an inactive vehicle or dead player
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Replicated)
@@ -45,7 +43,6 @@ public:
 
 	UFUNCTION()
 	virtual void ApplyInputs(const FTWPlayerInput& input) const; // virtual keyword needs to be present to make a function overridable
-	void EnableDebug();
 	
 	UFUNCTION(Server, Reliable)
 	void ServerTestSimple();
