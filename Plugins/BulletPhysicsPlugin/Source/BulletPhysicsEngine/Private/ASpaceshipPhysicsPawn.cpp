@@ -64,3 +64,11 @@ void ASpaceshipPhysicsPawn::ApplyInputs(const FTWPlayerInput& input) const
     //     MyRigidBody->setAngularVelocity(newAngVel);
     // }
 }
+
+void ASpaceshipPhysicsPawn::shootProjectile(TSubclassOf<ABasicPhysicsEntity> projectile, FVector direction,
+    FVector inheritedVelocity)
+{
+    
+}
+
+

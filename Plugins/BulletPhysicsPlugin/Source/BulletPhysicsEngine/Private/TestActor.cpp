@@ -3,7 +3,9 @@
 
 #include "TestActor.h"
 
+#include "BasicPhysicsEntity.h"
 #include "BasicPhysicsPawn.h"
+#include "Projects.h"
 #include "TWPlayerController.h"
 #include "LevelInstance/LevelInstanceTypes.h"
 #include "Types/AttributeStorage.h"
@@ -120,30 +122,41 @@ void ATestActor::SendInputToServer(AActor* actor, FTWPlayerInput input)
 	InputBuffers[actor]->Push(input);
 }
 
+void ATestActor::shootThing_Implementation(TSubclassOf<ABasicPhysicsEntity> projectileClass, FRotator direction,
+	FVector inheritedVelocity, FVector location, AActor* owner2)
+{
+	FTransform SpawnTransform(direction, location);
+	FActorSpawnParameters SpawnParams;
+	SpawnParams.Owner = owner2;
+	if (AActor* SpawnedProjectile = GetWorld()->SpawnActor<AActor>(projectileClass, SpawnTransform, SpawnParams))
+	{
+		UE_LOG(LogTemp, Log, TEXT("Successfully spawned projectile: %s"), *SpawnedProjectile->GetName());
+	}
+	// projectile BeginPlay adds it to the physics world and map
+	// automatically via AddRigidBodyAndReturn
+}
+
+/* This performs a resimulation on every client.
+ * In effect, this: resets every object's state to the one recieved by the server,
+ * Simulates back up to the predicted moment, reapplying inputs for the local pawn
+*/
 void ATestActor::MC_SendStateToClients_Implementation(FBulletSimulationState ServerState, const TArray<AActor*>& InputActors,
 	const TArray<FTWPlayerInput>& PlayerInputs)
 {
 	if (!HasAuthority())
 	{
-		// get player controller
 		APlayerController* PC = GetWorld()->GetFirstPlayerController();
 		ATWPlayerController* TWPC = Cast<ATWPlayerController>(PC); if (!TWPC) return;
-
 		int framesToRewind = FMath::RoundToInt(TWPC->RoundTripDelay / FixedDeltaTime);
 		FBulletSimulationState HistoricState = StateHistory.Get(framesToRewind);
-
-		// cache current state
-		CurrentState = GetCurrentState();
 		
-		// set local state to server states for resim
+		// prep all objects for resimulation
 		for (const auto& objState : ServerState.ObjectStates)
 		{
 			if (ActorToBody.Contains(objState.Actor))
 			{
 				btRigidBody* body = ActorToBody[objState.Actor];
-
 				body->clearForces();
-				
 				body->setWorldTransform(BulletHelpers::ToBt(objState.Transform, GetActorLocation()));
 				body->setLinearVelocity(BulletHelpers::ToBtDir(objState.Velocity, true));
 				body->setAngularVelocity(BulletHelpers::ToBtDir(objState.AngularVelocity, true));
@@ -157,57 +170,10 @@ void ATestActor::MC_SendStateToClients_Implementation(FBulletSimulationState Ser
 		// simulate up to prediction
 		for (int i = 0; i < framesToRewind; i++)
 		{
-			// for (int j = 0; j < InputActors.Num(); j++)
-			// { // apply other actors' inputs
-			// 	Cast<ABasicPhysicsPawn>(InputActors[j])->ApplyInputs(PlayerInputs[j]);
-			// }
-			
 			FTWPlayerInput PastInput = LocalInputBuffer.Get(framesToRewind-i);
 			LocalPawn->ApplyInputs(PastInput);
 			StepPhysics(FixedDeltaTime, 1);
 		}
-		//
-		// // Reapply/interpolate states of objects that were "close enough"
-		// for (const auto& objState : CurrentState.ObjectStates)
-		// {
-		//     if (ActorToBody.Contains(objState.Actor))
-		//     {
-		//         // Find the corresponding state in ServerState
-		//         for (const auto& serverObjState : ServerState.ObjectStates)
-		//         {
-		//             if (serverObjState.Actor == objState.Actor)
-		//             {
-		//                 // Calculate the difference
-		//                 FBulletObjectState Diff = serverObjState - objState;
-		//                 
-		//                 // If small enough difference, interpolate
-		//                 if (Diff.Transform.GetLocation().Length() < 10.0f)
-		//                 {
-		//                     btRigidBody* body = ActorToBody[objState.Actor];
-		//                     
-		//                     // Simple 50/50 blend between current state and server state
-		//                     FVector blendedLocation = (objState.Transform.GetLocation() + serverObjState.Transform.GetLocation()) * 0.5f;
-		//                     FQuat currentQuat = objState.Transform.GetRotation();
-		//                     FQuat serverQuat = serverObjState.Transform.GetRotation();
-		//                     FQuat blendedQuat = FQuat::Slerp(currentQuat, serverQuat, 0.5f);
-		//                     
-		//                     FVector blendedVelocity = (objState.Velocity + serverObjState.Velocity) * 0.5f;
-		//                     FVector blendedAngularVelocity = (objState.AngularVelocity + serverObjState.AngularVelocity) * 0.5f;
-		//                     
-		//                     // Create blended transform
-		//                     FTransform blendedTransform(blendedQuat, blendedLocation, objState.Transform.GetScale3D());
-		//                     
-		//                     // Apply the blended state
-		//                     body->clearForces();
-		//                     body->setWorldTransform(BulletHelpers::ToBt(blendedTransform, GetActorLocation()));
-		//                     body->setLinearVelocity(BulletHelpers::ToBtDir(blendedVelocity, true));
-		//                     body->setAngularVelocity(BulletHelpers::ToBtDir(blendedAngularVelocity, true));
-		//                 }
-		//                 break;
-		//             }
-		//         }
-		//     }
-		// }
 	}
 }
 

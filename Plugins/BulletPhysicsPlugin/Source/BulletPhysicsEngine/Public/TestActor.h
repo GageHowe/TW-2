@@ -13,6 +13,7 @@
 #include "Components/ShapeComponent.h"
 #include <functional>
 #include <queue>
+class ABasicPhysicsEntity;
 class ABasicPhysicsPawn; // forward declaration
 #include "BlueprintEditor.h"
 #include "HairStrandsInterface.h"
@@ -124,6 +125,9 @@ public:
 	UFUNCTION(BlueprintCallable, NetMulticast, Unreliable)
 	void MC_SendStateToClients(FBulletSimulationState ServerState, const TArray<AActor*>& InputActors, const TArray<FTWPlayerInput>& PlayerInputs);
 
+	UFUNCTION(Server, Reliable)
+	void shootThing(TSubclassOf<ABasicPhysicsEntity> projectileClass, FRotator direction, FVector inheritedVelocity, FVector location, AActor* owner2);
+	
 	// Global objects
 	btCollisionConfiguration* BtCollisionConfig;
 	btCollisionDispatcher* BtCollisionDispatcher;
@@ -188,7 +192,6 @@ public:
 	// E.g. when destroying an actor
 	void DestroyRigidBody(btRigidBody* rigidbody)
 	{
-
 		BodyToActor.Remove(rigidbody);
 		ActorToBody.Remove(*BodyToActor.Find(rigidbody));
 		BtWorld->removeRigidBody(rigidbody);
