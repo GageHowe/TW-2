@@ -147,7 +147,7 @@ void ATestActor::MC_SendStateToClients_Implementation(FBulletSimulationState Ser
 	{
 		APlayerController* PC = GetWorld()->GetFirstPlayerController();
 		ATWPlayerController* TWPC = Cast<ATWPlayerController>(PC); if (!TWPC) return;
-		int framesToRewind = FMath::RoundToInt(TWPC->RoundTripDelay / FixedDeltaTime);
+		int framesToRewind = FMath::RoundToInt(TWPC->RoundTripDelay / FixedDeltaTime / 2);
 		FBulletSimulationState HistoricState = StateHistory.Get(framesToRewind);
 		
 		// prep all objects for resimulation
