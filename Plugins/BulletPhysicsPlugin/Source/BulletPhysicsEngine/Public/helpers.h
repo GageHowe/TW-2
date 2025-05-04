@@ -26,13 +26,17 @@ struct FTWPlayerInput
 	UPROPERTY(BlueprintReadWrite) // move this to int8s or bools for bandwidth
 	FVector MovementInput = {0,0,0}; // 0-1 on all axes, in local space
 
+	// this is like "intended rotation" for a free camera. this should never be overriden by the server.
 	UPROPERTY(BlueprintReadWrite)
-	FRotator RotationInput = {0,0,0};
+	FRotator ControlRotation = {0,0,0};
 
+	// these are rotation diffs eg. for piloting a spaceship
 	UPROPERTY()
-	int8 TurnRight = 0;
+	float TurnRight = 0;
 	UPROPERTY()
-	int8 TurnUp = 0;
+	float TurnUp = 0;
+	UPROPERTY()
+	float RollRight = 0;
 
 	UPROPERTY(BlueprintReadWrite)
 	bool BoostInput = false; // 0-1

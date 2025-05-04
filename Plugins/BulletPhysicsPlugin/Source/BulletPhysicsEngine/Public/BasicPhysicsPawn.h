@@ -15,6 +15,24 @@ public:
 	ABasicPhysicsPawn();
 	virtual void Tick(float DeltaTime) override;
 	virtual void AsyncPhysicsTickActor(float DeltaTime, float SimTime) override;
+
+	void SetTurnUpInput(float X)
+	{
+		CurrentTurnUp = X;
+		AddControllerPitchInput(X);
+	}
+
+	void SetTurnRightInput(float X)
+	{
+		CurrentTurnRight = X;
+	}
+
+
+	void SetRollRightInput(float X)
+	{
+		CurrentRollRight = X;
+	}
+	
 	virtual void SetupPlayerInputComponent(class UInputComponent* InputComponent) override;
 	virtual void BeginPlay() override;
 	virtual void GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const override;
@@ -25,8 +43,9 @@ public:
 	bool CurrentPrimaryInput = false;
 	bool CurrentSecondaryInput = false;
 	bool CurrentBoostInput = false;
-	int8 CurrentTurnRight = 0;
-	int8 CurrentTurnUp = 0;
+	float CurrentTurnRight = 0;
+	float CurrentTurnUp = 0;
+	float CurrentRollRight = 0;
 
 	bool mustCorrectState = false;
 	
@@ -42,7 +61,7 @@ public:
 	bool IsPossessed = true;
 
 	UFUNCTION()
-	virtual void ApplyInputs(const FTWPlayerInput& input) const; // virtual keyword needs to be present to make a function overridable
+	virtual void ApplyInputs(const FTWPlayerInput& input); // virtual keyword needs to be present to make a function overridable
 	
 	UFUNCTION(Server, Reliable)
 	void ServerTestSimple();

@@ -6,7 +6,7 @@ void AHumanoidPhysicsPawn::BeginPlay()
 	// yRigidBody->addConstraintRef()
 }
 
-void AHumanoidPhysicsPawn::ApplyInputs(const FTWPlayerInput& input) const
+void AHumanoidPhysicsPawn::ApplyInputs(const FTWPlayerInput& input)
 {
 	Super::ApplyInputs(input);
 	// walk around

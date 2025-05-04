@@ -16,13 +16,8 @@ ABasicPhysicsPawn::ABasicPhysicsPawn()
 	StaticMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("PlayerMesh"));
 	RootComponent = StaticMesh;
 
-	USpringArmComponent* SpringArm = CreateDefaultSubobject<USpringArmComponent>(TEXT("SpringArm"));
-	SpringArm->bUsePawnControlRotation = true; // changed
-	SpringArm->SetupAttachment(RootComponent);
-	
-	Camera = CreateDefaultSubobject<UCameraComponent>(TEXT("Player"));
-	Camera->bUsePawnControlRotation = false; // idk what this does
-	Camera->SetupAttachment(SpringArm);
+	Camera = CreateDefaultSubobject<UCameraComponent>(TEXT("Camera"));
+	Camera->SetupAttachment(RootComponent);
 	
 	SpawnCollisionHandlingMethod = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
 
@@ -65,74 +60,25 @@ void ABasicPhysicsPawn::Tick(float DeltaTime)
 void ABasicPhysicsPawn::AsyncPhysicsTickActor(float DeltaTime, float SimTime)
 {
 	Super::AsyncPhysicsTickActor(DeltaTime, SimTime);
-	
+
+	// send inputs to the server
 	if (IsLocallyControlled())
 	{
 		FTWPlayerInput input = FTWPlayerInput();
 		input.MovementInput = CurrentDirectionalInput;
 		input.TurnRight = CurrentTurnRight;
 		input.TurnUp = CurrentTurnUp;
+		input.RollRight = CurrentRollRight;
 		input.BoostInput = CurrentBoostInput;
-		input.RotationInput = GetControlRotation();
+		// input.RotationInput = GetControlRotation(); // depricated
 		BulletWorld->LocalInputBuffer.Push(input);
 		ApplyInputs(input);
-		if (!HasAuthority()) {SendInputsToServer(this, input);} // edge case, don't process inputs twice if listen server
+		if (!HasAuthority()) {SendInputsToServer(this, input);}
 	}
 }
 
 // override this function when creating children
-void ABasicPhysicsPawn::ApplyInputs(const FTWPlayerInput& input) const
-{
-	// movement force
-	btVector3 forceVector = BulletHelpers::ToBtDir(input.MovementInput, true) * 10000.0f;
-	if (!MyRigidBody) { GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Red, TEXT("WARNING RigidBody ptr is null 2")); return; }
-	MyRigidBody->applyForce(forceVector, btVector3(0, 0, 0));
-	
-	if (input.BoostInput == 1.0f)
-	{
-		MyRigidBody->setAngularVelocity(BulletHelpers::ToBtDir(BulletHelpers::ToUEDir(MyRigidBody->getAngularVelocity(), true)) * 0.95);
-	}
-	if (input.TurnRight != 0 || input.TurnUp != 0)
-	{
-		// Convert int8 inputs to radians (scale as needed for rotation speed)
-		float turnRightRad = input.TurnRight / 127.0f * 0.05f;
-		float turnUpRad = input.TurnUp / 127.0f * 0.05f;
-        
-		// Get current transform
-		btTransform currentTransform = MyRigidBody->getWorldTransform();
-		btQuaternion currentRotation = currentTransform.getRotation();
-        
-		// Create rotation quaternions for each axis
-		btQuaternion yawRotation(btVector3(0, 0, 1), turnRightRad);  // Z-axis rotation
-		btQuaternion pitchRotation(btVector3(0, -1, 0), turnUpRad);   // X-axis rotation
-        
-		// Apply rotations in sequence (order matters!)
-		// Typically yaw (right) then pitch (up)
-		btQuaternion newRotation = yawRotation * currentRotation * pitchRotation;
-		newRotation.normalize();
-
-		// MyRigidBody->applyTorque(btQuaternion(newRotation));
-        
-		// Update the transform with new rotation while keeping position
-		currentTransform.setRotation(newRotation);
-		MyRigidBody->setWorldTransform(currentTransform);
-	}
-	// // Apply movement force (need to make this relative to orientation)
-	// if (!input.MovementInput.IsNearlyZero())
-	// {
-	// 	// Get current rotation
-	// 	btQuaternion rotation = MyRigidBody->getWorldTransform().getRotation();
- //        
-	// 	// Convert input to bullet vector
-	// 	btVector3 localForce = BulletHelpers::ToBtDir(input.MovementInput, true) * 10000.0f;
- //        
-	// 	// Rotate force to match pawn orientation
-	// 	btVector3 worldForce = rotation.rotate(localForce);
- //        
-	// 	// Apply the oriented force
-	// 	MyRigidBody->applyForce(worldForce, btVector3(0, 0, 0));
-	// }
-}
+void ABasicPhysicsPawn::ApplyInputs(const FTWPlayerInput& input) {}
 
 void ABasicPhysicsPawn::ServerTestSimple_Implementation()
 {
@@ -166,13 +112,14 @@ void ABasicPhysicsPawn::SetupPlayerInputComponent(class UInputComponent* ThisInp
 	InputComponent->BindAction(TEXT("Boost"), IE_Released, this, &ABasicPhysicsPawn::DisableBoost);
 
 	// no longer are we directly controlling the pawn with the input
-	// InputComponent->BindAxis(TEXT("LookRight"), this, &ABasicPhysicsPawn::SetTurnRightInput);
-	// InputComponent->BindAxis(TEXT("LookUp"), this, &ABasicPhysicsPawn::SetTurnUpInput);
-
-	// camera free look
-	InputComponent->BindAxis("LookUp", this, &APawn::AddControllerPitchInput);
-	InputComponent->BindAxis("LookRight", this, &APawn::AddControllerYawInput);
-    
+	InputComponent->BindAxis(TEXT("LookRight"), this, &ABasicPhysicsPawn::SetTurnRightInput);
+	InputComponent->BindAxis(TEXT("LookUp"), this, &ABasicPhysicsPawn::SetTurnUpInput);
+	InputComponent->BindAxis(TEXT("Roll"), this, &ABasicPhysicsPawn::SetRollRightInput);
+	//
+	
+	// // camera free look
+	// InputComponent->BindAxis("LookUp", this, &APawn::AddControllerPitchInput);
+	// InputComponent->BindAxis("LookRight", this, &APawn::AddControllerYawInput);
 }
 
 void ABasicPhysicsPawn::SendInputsToServer_Implementation(AActor* actor, FTWPlayerInput input)
