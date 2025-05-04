@@ -11,10 +11,6 @@ ABasicPhysicsEntity::ABasicPhysicsEntity()
 	bReplicates = true;
 	SetReplicatingMovement(false);
 
-	// fix/deprecate this?
-	StaticMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("ProjectileMesh"));
-	RootComponent = StaticMesh;
-
 	SpawnCollisionHandlingMethod = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
 }
 

@@ -6,6 +6,12 @@ void ASpaceshipPhysicsPawn::ApplyInputs(const FTWPlayerInput& input) const
         GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Red, TEXT("WARNING RigidBody ptr is null 2")); 
         return; 
     }
+
+    bool firing = input.BoostInput;
+    if (firing)
+    {
+        // TODO: world->shootThing()
+    }
     
     // Apply movement force in local space
     btVector3 localForce = btVector3(

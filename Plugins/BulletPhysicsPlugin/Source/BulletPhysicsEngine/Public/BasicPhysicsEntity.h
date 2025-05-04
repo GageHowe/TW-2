@@ -13,17 +13,15 @@ public:
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaTime) override;
 	virtual void AsyncPhysicsTickActor(float DeltaTime, float SimTime) override;
-
-	// deprecate? do we still use this?
-	bool mustCorrectState = false;
 	
 	btRigidBody* MyRigidBody = nullptr;
 	
 	UPROPERTY(EditAnywhere)
 	ATestActor* BulletWorld = nullptr;
-private:
+
 	UPROPERTY(EditDefaultsOnly)
 	UStaticMeshComponent* StaticMesh;
+private:
 protected:
 	UPROPERTY(EditDefaultsOnly)
 	ATestActor* world;
