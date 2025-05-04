@@ -11,4 +11,6 @@ public:
 	// virtual void AddControllerPitchInput(float Val) override;
 	// virtual void AddControllerYawInput(float Val) override;
 	void shootProjectile(TSubclassOf<ABasicPhysicsEntity> projectile, FVector direction, FVector inheritedVelocity);
+	UPROPERTY(EditDefaultsOnly)
+	TSubclassOf<ABasicPhysicsEntity> projectile1ToSpawn;
 };

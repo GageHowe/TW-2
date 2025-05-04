@@ -1,5 +1,7 @@
 ﻿#include "ASpaceshipPhysicsPawn.h"
 
+#include "BansheeBomb.h"
+
 void ASpaceshipPhysicsPawn::ApplyInputs(const FTWPlayerInput& input) const
 {
     if (!MyRigidBody) { 
@@ -11,6 +13,7 @@ void ASpaceshipPhysicsPawn::ApplyInputs(const FTWPlayerInput& input) const
     if (firing)
     {
         // TODO: world->shootThing()
+        // world->shootThing(projectile1ToSpawn, {0,0,0}, {0,0,0}, this->GetActorLocation(), this);
     }
     
     // Apply movement force in local space
