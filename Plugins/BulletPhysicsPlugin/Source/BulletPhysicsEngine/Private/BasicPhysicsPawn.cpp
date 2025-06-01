@@ -12,6 +12,8 @@ ABasicPhysicsPawn::ABasicPhysicsPawn()
 	bAsyncPhysicsTickEnabled = true;
 	bReplicates = true;
 	SetReplicatingMovement(false);
+	SpawnCollisionHandlingMethod = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
+
 	
 	StaticMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("PlayerMesh"));
 	RootComponent = StaticMesh;
@@ -19,8 +21,6 @@ ABasicPhysicsPawn::ABasicPhysicsPawn()
 	Camera = CreateDefaultSubobject<UCameraComponent>(TEXT("Camera"));
 	Camera->SetupAttachment(RootComponent);
 	
-	SpawnCollisionHandlingMethod = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
-
 	// SetReplicates(true);
 }
 

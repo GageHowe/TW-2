@@ -11,3 +11,8 @@ void AHumanoidPhysicsPawn::ApplyInputs(const FTWPlayerInput& input)
 	Super::ApplyInputs(input);
 	// walk around
 }
+
+void AHumanoidPhysicsPawn::UpdateGroundedState()
+{
+	
+}

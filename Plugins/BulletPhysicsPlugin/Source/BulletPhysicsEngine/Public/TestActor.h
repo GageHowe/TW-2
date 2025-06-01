@@ -35,6 +35,12 @@ class BULLETPHYSICSENGINE_API ATestActor : public AActor
 public:	
 	ATestActor();
 
+	// for interpolation/correction
+	UPROPERTY()
+	FBulletObjectState LocalPlayerError;
+	UPROPERTY()
+	bool bHasLocalPlayerError = false;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FBulletSimulationState CurrentState;
 
@@ -45,7 +51,7 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	ABasicPhysicsPawn* LocalPawn; // this is set on PossessedBy
 
-	bool tock = false; // for syncing the 
+	bool tock = false; // for syncing every other tick (30/s)
 
 	// Frames
 	// UPROPERTY(EditAnywhere, BlueprintReadWrite)

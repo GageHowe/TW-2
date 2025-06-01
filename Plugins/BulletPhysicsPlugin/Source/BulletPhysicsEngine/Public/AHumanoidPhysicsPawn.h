@@ -9,4 +9,8 @@ class AHumanoidPhysicsPawn  : public ABasicPhysicsPawn
 public:
 	virtual void BeginPlay() override;
 	virtual void ApplyInputs(const FTWPlayerInput& input) override;
+
+	void UpdateGroundedState();
+
+	bool bIsGrounded = false;
 };
