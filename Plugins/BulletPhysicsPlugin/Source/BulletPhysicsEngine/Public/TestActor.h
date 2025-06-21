@@ -127,6 +127,22 @@ public:
 		}
 	}
 
+	// Functions for interacting between Bullet bodies and State
+	FBulletObjectState GetBodyState(btRigidBody* body)
+	{
+		FBulletObjectState state;
+		state.Transform = BulletHelpers::ToUE(body->getWorldTransform(), GetActorLocation());
+		state.Velocity = BulletHelpers::ToUEDir(body->getLinearVelocity(), true);
+		state.AngularVelocity = BulletHelpers::ToUEDir(body->getAngularVelocity(), true);
+		return state;
+	}
+	void SetBodyState(btRigidBody* body, const FBulletObjectState& state) const
+	{
+		body->setWorldTransform(BulletHelpers::ToBt(state.Transform, GetActorLocation()));
+		body->setLinearVelocity(BulletHelpers::ToBtDir(state.Velocity, true));
+		body->setAngularVelocity(BulletHelpers::ToBtDir(state.AngularVelocity, true));
+	}
+	
 	// send state and actors' last input
 	UFUNCTION(BlueprintCallable, NetMulticast, Unreliable)
 	void MC_SendStateToClients(FBulletSimulationState ServerState, const TArray<AActor*>& InputActors, const TArray<FTWPlayerInput>& PlayerInputs);

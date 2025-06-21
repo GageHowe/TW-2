@@ -180,69 +180,69 @@ void ATestActor::shootThing_Implementation(TSubclassOf<ABasicPhysicsEntity> proj
         APlayerController* PC = GetWorld()->GetFirstPlayerController();
         ATWPlayerController* TWPC = Cast<ATWPlayerController>(PC); 
         if (!TWPC) return;
-        
-        int framesToRewind = FMath::RoundToInt(TWPC->RoundTripDelay / FixedDeltaTime / 2);
-        
-        // Store local player's current state before correction
-        FTransform localPlayerCurrentTransform;
-        FVector localPlayerCurrentVelocity;
-        if (LocalPawn && ActorToBody.Contains(LocalPawn))
-        {
-            btRigidBody* localBody = ActorToBody[LocalPawn];
-            localPlayerCurrentTransform = BulletHelpers::ToUE(localBody->getWorldTransform(), GetActorLocation());
-            localPlayerCurrentVelocity = BulletHelpers::ToUEDir(localBody->getLinearVelocity(), true);
-        }
-        
-        // Set all objects to server state (including local player)
-        for (const auto& objState : ServerState.ObjectStates)
-        {
-            if (ActorToBody.Contains(objState.Actor))
-            {
-                btRigidBody* body = ActorToBody[objState.Actor];
-                body->clearForces();
-                
-                // For local player, blend toward server state instead of snapping
-                if (objState.Actor == LocalPawn)
-                {
-                    FVector serverPos = objState.Transform.GetLocation();
-                    FVector currentPos = localPlayerCurrentTransform.GetLocation();
-                    FVector blendedPos = FMath::Lerp(currentPos, serverPos, 0.9f);
-                    
-                    FTransform blendedTransform = objState.Transform;
-                    blendedTransform.SetLocation(blendedPos);
-                    body->setWorldTransform(BulletHelpers::ToBt(blendedTransform, GetActorLocation()));
-                	
-                    body->setLinearVelocity(BulletHelpers::ToBtDir(objState.Velocity, true));
-                    body->setAngularVelocity(BulletHelpers::ToBtDir(objState.AngularVelocity, true));
-                }
-                else
-                {
-                    // Other players: snap to server state
-                    body->setWorldTransform(BulletHelpers::ToBt(objState.Transform, GetActorLocation()));
-                    body->setLinearVelocity(BulletHelpers::ToBtDir(objState.Velocity, true));
-                    body->setAngularVelocity(BulletHelpers::ToBtDir(objState.AngularVelocity, true));
-                }
-            }
-        }
-        
-        // Resimulate forward
+    	int framesToRewind = FMath::RoundToInt(TWPC->RoundTripDelay / FixedDeltaTime / 2);
+    	
+    	// interpolate simulated and perceived state
+    	for (const auto& pair : ActorToBody)
+    	{
+    		AActor* actor = pair.Key;
+    		btRigidBody* body = pair.Value;
+	  
+    		FBulletObjectState localState = GetBodyState(body);
+    		
+    		// find matching ObjectState in ServerState
+    		FBulletObjectState* SState = ServerState.ObjectStates.FindByPredicate([actor](const FBulletObjectState& state) 
+			{ 
+				return state.Actor == actor; 
+			});
+
+    		// interpolate to match prediction
+    		FBulletObjectState targetState = InterpolateObjectStates(localState, *SState, 0.05);
+    		SetBodyState(body, targetState);
+    	}
+    	
+        // Resimulate forward (up to current prediction)
         for (int i = 0; i < framesToRewind; i++)
         {
-            FTWPlayerInput PastInput = LocalInputBuffer.Get(framesToRewind-i);
-            try
-            {
+            FTWPlayerInput PastInput = LocalInputBuffer.Get(framesToRewind-i); // -1 or -i?
+            try {
 	            LocalPawn->ApplyInputs(PastInput);
-            } catch(...)
-            {}
+            } catch(...) {}
             StepPhysics(FixedDeltaTime, 1);
         }
     }
 }
 
 
-
-
-
+//
+// void ATestActor::MC_SendStateToClients_Implementation(FBulletSimulationState ServerState, const TArray<AActor*>& InputActors, const TArray<FTWPlayerInput>& PlayerInputs)
+// {
+// 	if (!HasAuthority())
+// 	{
+// 		APlayerController* PC = GetWorld()->GetFirstPlayerController();
+// 		ATWPlayerController* TWPC = Cast<ATWPlayerController>(PC); 
+// 		if (!TWPC) return;
+// 		int framesToRewind = FMath::RoundToInt(TWPC->RoundTripDelay / FixedDeltaTime / 2);
+//
+// 		// capture current local predicted state
+// 		FBulletSimulationState predicted =  GetCurrentState();
+//     	
+// 		// Resimulate forward (up to current prediction)
+// 		for (int i = 0; i < framesToRewind; i++)
+// 		{
+// 			FTWPlayerInput PastInput = LocalInputBuffer.Get(framesToRewind-i); // -1 or -i?
+// 			try {
+// 				LocalPawn->ApplyInputs(PastInput);
+// 			} catch(...) {}
+// 			StepPhysics(FixedDeltaTime, 1);
+// 		}
+//
+// 		// interpolate to server+input prediction
+// 		SetLocalState(InterpolateSimState(predicted, ServerState, 0.2));
+//
+//     	
+// 	}
+// }
 
 
 

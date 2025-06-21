@@ -17,7 +17,6 @@ public:
         , Head(0)
     {}
 
-    /** Add an element to the buffer */
     void Push(const T& Item)
     {
         // Make sure the array is big enough for the current head position
@@ -108,28 +107,24 @@ public:
         return Buffer[NewestIndex];
     }
 
-    /** Return number of items currently in the buffer */
     int32 GetSize() const
     {
         return Size;
     }
 
-    /** Check if the buffer is empty */
     bool IsEmpty() const
     {
         return Size == 0;
     }
 
-    /** Check if the buffer is full */
     bool IsFull() const
     {
         return Size == Capacity;
     }
 
-    /** Clear the buffer */
     void Clear()
     {
-        Buffer.Empty(); // Release all memory
+        Buffer.Empty();
         Size = 0;
         Head = 0;
     }

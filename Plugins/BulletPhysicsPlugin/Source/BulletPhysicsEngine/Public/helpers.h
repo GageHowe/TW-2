@@ -101,6 +101,40 @@ struct FBulletSimulationState
 	double CurrentTime = 0;
 };
 
+static FBulletObjectState InterpolateObjectStates(const FBulletObjectState& a, const FBulletObjectState& b, float alpha)
+{
+	FBulletObjectState result;
+	result.Actor = a.Actor; // Preserve actor reference
+	result.Transform.SetLocation(FMath::Lerp(a.Transform.GetLocation(), b.Transform.GetLocation(), alpha));
+	result.Transform.SetRotation(FQuat::Slerp(a.Transform.GetRotation(), b.Transform.GetRotation(), alpha));
+	result.Velocity = FMath::Lerp(a.Velocity, b.Velocity, alpha);
+	result.AngularVelocity = FMath::Lerp(a.AngularVelocity, b.AngularVelocity, alpha);
+	return result;
+}
+
+inline FBulletSimulationState InterpolateSimState(FBulletSimulationState& a, FBulletSimulationState& b, float alpha)
+{
+	FBulletSimulationState result;
+	result.CurrentTime = FMath::Lerp(a.CurrentTime, b.CurrentTime, alpha);
+    
+	for (FBulletObjectState& stateA : a.ObjectStates)
+	{
+		FBulletObjectState* stateB = b.ObjectStates.FindByPredicate([&stateA](const FBulletObjectState& state) 
+		{ 
+			return state.Actor == stateA.Actor; 
+		});
+        
+		if (stateB)
+		{
+			FBulletObjectState interpolatedState = InterpolateObjectStates(stateA, *stateB, alpha);
+			result.ObjectStates.Add(interpolatedState);
+		}
+		else { result.ObjectStates.Add(stateA); }
+	}
+    
+	return result;
+}
+
 // Convert TMap to a pair of arrays
 template<typename KeyType, typename ValueType>
 TPair<TArray<KeyType>, TArray<ValueType>> TMapToArrays(const TMap<KeyType, ValueType>& Map)

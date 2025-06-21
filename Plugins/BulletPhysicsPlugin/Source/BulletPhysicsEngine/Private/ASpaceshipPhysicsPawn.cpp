@@ -5,7 +5,7 @@
 void ASpaceshipPhysicsPawn::BeginPlay()
 {
     Super::BeginPlay();
-    MyRigidBody->setDamping(0.05,0.3);
+    MyRigidBody->setDamping(0.03,0.5);
 }
 
 void ASpaceshipPhysicsPawn::ApplyInputs(const FTWPlayerInput& input)
@@ -22,7 +22,7 @@ void ASpaceshipPhysicsPawn::ApplyInputs(const FTWPlayerInput& input)
         world->shootThing(projectile1ToSpawn, {0,0,0}, {0,0,0}, this->GetActorLocation(), this);
     }
     
-    // movement on wasd(space)(ctrl)
+    // movement on wasd+space+ctrl
     btVector3 localForce = btVector3(
         input.MovementInput.X,
         input.MovementInput.Y,
