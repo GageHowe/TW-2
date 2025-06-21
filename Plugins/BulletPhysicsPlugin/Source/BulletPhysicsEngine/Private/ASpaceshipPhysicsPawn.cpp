@@ -5,7 +5,7 @@
 void ASpaceshipPhysicsPawn::BeginPlay()
 {
     Super::BeginPlay();
-    MyRigidBody->setDamping(0.5,0.5);
+    MyRigidBody->setDamping(0.05,0.3);
 }
 
 void ASpaceshipPhysicsPawn::ApplyInputs(const FTWPlayerInput& input)
@@ -22,7 +22,7 @@ void ASpaceshipPhysicsPawn::ApplyInputs(const FTWPlayerInput& input)
         world->shootThing(projectile1ToSpawn, {0,0,0}, {0,0,0}, this->GetActorLocation(), this);
     }
     
-    // Apply movement force in local space
+    // movement on wasd(space)(ctrl)
     btVector3 localForce = btVector3(
         input.MovementInput.X,
         input.MovementInput.Y,
@@ -32,18 +32,13 @@ void ASpaceshipPhysicsPawn::ApplyInputs(const FTWPlayerInput& input)
     btVector3 worldForce = quatRotate(currentRotation, localForce);
     MyRigidBody->applyForce(worldForce, btVector3(0, 0, 0));
     
-
-    // Define rotation torque in local space
+    // torque on mouse turn
     btVector3 localTorque = btVector3(
         input.RollRight * -1,
         input.TurnUp,
         input.TurnRight
-    ) * 0.1f;
-
-    // Manually transform local torque to world space using the current rotation
+    ) * 0.05f;
     btVector3 worldTorque = quatRotate(currentRotation, localTorque);
-
-    // Apply the transformed world-space torque using applyTorque
     MyRigidBody->applyTorque(worldTorque);
 }
 

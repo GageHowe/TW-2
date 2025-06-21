@@ -43,14 +43,48 @@ void ATestActor::BeginPlay()
 void ATestActor::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
-	// Dep. Physics networking logic is now in async physics tick
+	// Physics networking logic is now in async physics tick
+}
+
+void ATestActor::ApplyLocalPlayerErrorCorrection(float DeltaTime)
+{
+	const float CorrectionSpeed = 8.0f; // Adjust for correction rate
+    
+	btRigidBody* body = ActorToBody[LocalPawn];
+	if (!body) return;
+    
+	// Lerp position error toward zero
+	FVector positionCorrection = LocalPlayerError.Transform.GetLocation() * CorrectionSpeed * DeltaTime;
+	FVector velocityCorrection = LocalPlayerError.Velocity * CorrectionSpeed * DeltaTime;
+    
+	// Apply corrections
+	btTransform currentTransform = body->getWorldTransform();
+	currentTransform.setOrigin(currentTransform.getOrigin() + BulletHelpers::ToBtPos(positionCorrection, FVector::ZeroVector));
+	body->setWorldTransform(currentTransform);
+    
+	btVector3 currentVel = body->getLinearVelocity();
+	body->setLinearVelocity(currentVel + BulletHelpers::ToBtDir(velocityCorrection, true));
+    
+	// Reduce error
+	LocalPlayerError.Transform.SetLocation(LocalPlayerError.Transform.GetLocation() - positionCorrection);
+	LocalPlayerError.Velocity = LocalPlayerError.Velocity - velocityCorrection;
+    
+	// Clear error when small enough
+	if (LocalPlayerError.Transform.GetLocation().Size() < 1.0f && LocalPlayerError.Velocity.Size() < 10.0f)
+	{
+		bHasLocalPlayerError = false;
+	}
 }
 
 void ATestActor::AsyncPhysicsTickActor(float DeltaTime, float SimTime)
 {
 	
-	Super::AsyncPhysicsTickActor(DeltaTime, SimTime);
+	GEngine->AddOnScreenDebugMessage(2, 1.0f, FColor::Red, FString::Printf(TEXT("Error: %i"), bHasLocalPlayerError));
 
+	// if (!HasAuthority() && bHasLocalPlayerError && LocalPawn)
+	// {
+	// 	ApplyLocalPlayerErrorCorrection(DeltaTime);
+	// }
 	StepPhysics(DeltaTime, 1);
 	randvar = mt->getRandSeed();
 	CurrentState = GetCurrentState();
@@ -94,12 +128,12 @@ void ATestActor::AsyncPhysicsTickActor(float DeltaTime, float SimTime)
 
 		// TODO: investigate filtering CurrentState by proximity/look direction/etc to client to save bandwidth
 		// TODO: Don't send inputs of actors/pawns not being controlled
-		if (tock) {
+		// if (tock) {
 			MC_SendStateToClients(CurrentState, InputActorArray, InputArray);
-			tock = false;
-		} else {
-			tock = true;
-		}
+		// 	tock = false;
+		// } else {
+		// 	tock = true;
+		// }
 		
 	} else // if client
 	{
@@ -139,42 +173,70 @@ void ATestActor::shootThing_Implementation(TSubclassOf<ABasicPhysicsEntity> proj
 /* This performs a resimulation on every client.
  * In effect, this: resets every object's state to the one recieved by the server,
  * Simulates back up to the predicted moment, reapplying inputs for the local pawn
-*/
-void ATestActor::MC_SendStateToClients_Implementation(FBulletSimulationState ServerState, const TArray<AActor*>& InputActors,
-	const TArray<FTWPlayerInput>& PlayerInputs)
+*/void ATestActor::MC_SendStateToClients_Implementation(FBulletSimulationState ServerState, const TArray<AActor*>& InputActors, const TArray<FTWPlayerInput>& PlayerInputs)
 {
-	if (!HasAuthority())
-	{
-		APlayerController* PC = GetWorld()->GetFirstPlayerController();
-		ATWPlayerController* TWPC = Cast<ATWPlayerController>(PC); if (!TWPC) return;
-		int framesToRewind = FMath::RoundToInt(TWPC->RoundTripDelay / FixedDeltaTime / 2);
-		FBulletSimulationState HistoricState = StateHistory.Get(framesToRewind);
-		
-		// prep all objects for resimulation
-		for (const auto& objState : ServerState.ObjectStates)
-		{
-			if (ActorToBody.Contains(objState.Actor))
-			{
-				btRigidBody* body = ActorToBody[objState.Actor];
-				body->clearForces();
-				body->setWorldTransform(BulletHelpers::ToBt(objState.Transform, GetActorLocation()));
-				body->setLinearVelocity(BulletHelpers::ToBtDir(objState.Velocity, true));
-				body->setAngularVelocity(BulletHelpers::ToBtDir(objState.AngularVelocity, true));
-			}
-			else
-			{
-				UE_LOG(LogTemp, Warning, TEXT("SetLocalState: Actor not found in ActorToBody map"));
-			}
-		}
-		
-		// simulate up to prediction
-		for (int i = 0; i < framesToRewind; i++)
-		{
-			FTWPlayerInput PastInput = LocalInputBuffer.Get(framesToRewind-i);
-			LocalPawn->ApplyInputs(PastInput);
-			StepPhysics(FixedDeltaTime, 1);
-		}
-	}
+    if (!HasAuthority())
+    {
+        APlayerController* PC = GetWorld()->GetFirstPlayerController();
+        ATWPlayerController* TWPC = Cast<ATWPlayerController>(PC); 
+        if (!TWPC) return;
+        
+        int framesToRewind = FMath::RoundToInt(TWPC->RoundTripDelay / FixedDeltaTime / 2);
+        
+        // Store local player's current state before correction
+        FTransform localPlayerCurrentTransform;
+        FVector localPlayerCurrentVelocity;
+        if (LocalPawn && ActorToBody.Contains(LocalPawn))
+        {
+            btRigidBody* localBody = ActorToBody[LocalPawn];
+            localPlayerCurrentTransform = BulletHelpers::ToUE(localBody->getWorldTransform(), GetActorLocation());
+            localPlayerCurrentVelocity = BulletHelpers::ToUEDir(localBody->getLinearVelocity(), true);
+        }
+        
+        // Set all objects to server state (including local player)
+        for (const auto& objState : ServerState.ObjectStates)
+        {
+            if (ActorToBody.Contains(objState.Actor))
+            {
+                btRigidBody* body = ActorToBody[objState.Actor];
+                body->clearForces();
+                
+                // For local player, blend toward server state instead of snapping
+                if (objState.Actor == LocalPawn)
+                {
+                    FVector serverPos = objState.Transform.GetLocation();
+                    FVector currentPos = localPlayerCurrentTransform.GetLocation();
+                    FVector blendedPos = FMath::Lerp(currentPos, serverPos, 0.9f);
+                    
+                    FTransform blendedTransform = objState.Transform;
+                    blendedTransform.SetLocation(blendedPos);
+                    body->setWorldTransform(BulletHelpers::ToBt(blendedTransform, GetActorLocation()));
+                	
+                    body->setLinearVelocity(BulletHelpers::ToBtDir(objState.Velocity, true));
+                    body->setAngularVelocity(BulletHelpers::ToBtDir(objState.AngularVelocity, true));
+                }
+                else
+                {
+                    // Other players: snap to server state
+                    body->setWorldTransform(BulletHelpers::ToBt(objState.Transform, GetActorLocation()));
+                    body->setLinearVelocity(BulletHelpers::ToBtDir(objState.Velocity, true));
+                    body->setAngularVelocity(BulletHelpers::ToBtDir(objState.AngularVelocity, true));
+                }
+            }
+        }
+        
+        // Resimulate forward
+        for (int i = 0; i < framesToRewind; i++)
+        {
+            FTWPlayerInput PastInput = LocalInputBuffer.Get(framesToRewind-i);
+            try
+            {
+	            LocalPawn->ApplyInputs(PastInput);
+            } catch(...)
+            {}
+            StepPhysics(FixedDeltaTime, 1);
+        }
+    }
 }
 
 
@@ -615,11 +677,11 @@ btRigidBody* ATestActor::AddRigidBody(AActor* Actor, const ATestActor::CachedDyn
 }
 btRigidBody* ATestActor::AddRigidBody(AActor* Actor, btCollisionShape* CollisionShape, btVector3 Inertia, float Mass, float Friction, float Restitution)
 {
-	GEngine->AddOnScreenDebugMessage(        -1,          // Key: Unique identifier for the message, -1 to display multiple times
-		5.0f,        // Duration: Time in seconds the message stays on screen
-		FColor::Red, // Color: Text color, e.g., FColor::Red, FColor::Green
-		TEXT("A body was created") // Message: The string to display
-	);
+	// GEngine->AddOnScreenDebugMessage(        -1,          // Key: Unique identifier for the message, -1 to display multiple times
+	// 	5.0f,        // Duration: Time in seconds the message stays on screen
+	// 	FColor::Red, // Color: Text color, e.g., FColor::Red, FColor::Green
+	// 	TEXT("A body was created") // Message: The string to display
+	// );
 	auto Origin = GetActorLocation();
 	auto MotionState = new BulletCustomMotionState(Actor, Origin);
 	const btRigidBody::btRigidBodyConstructionInfo rbInfo(Mass*10, MotionState, CollisionShape, Inertia*10);

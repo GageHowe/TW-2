@@ -88,6 +88,7 @@ void ABasicPhysicsPawn::ServerTestSimple_Implementation()
 void ABasicPhysicsPawn::PossessedBy(AController* NewController)
 {
 	Super::PossessedBy(NewController);
+	
 	IsPossessed = true;
 	if (BulletWorld && IsLocallyControlled())
 	{
