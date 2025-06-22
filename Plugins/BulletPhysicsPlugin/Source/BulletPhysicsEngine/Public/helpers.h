@@ -115,7 +115,6 @@ static FBulletObjectState InterpolateObjectStates(const FBulletObjectState& a, c
 inline FBulletSimulationState InterpolateSimState(FBulletSimulationState& a, FBulletSimulationState& b, float alpha)
 {
 	FBulletSimulationState result;
-	result.CurrentTime = FMath::Lerp(a.CurrentTime, b.CurrentTime, alpha);
     
 	for (FBulletObjectState& stateA : a.ObjectStates)
 	{

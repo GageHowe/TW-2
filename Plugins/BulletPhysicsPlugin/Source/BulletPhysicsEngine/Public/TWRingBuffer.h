@@ -11,7 +11,7 @@ class TWRingBuffer
 {
 public:
     /** Constructor with configurable capacity */
-    explicit TWRingBuffer(int32 InCapacity = 128)
+    explicit TWRingBuffer(int32 InCapacity = 256)
         : Capacity(InCapacity)
         , Size(0)
         , Head(0)

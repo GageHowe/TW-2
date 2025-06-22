@@ -31,13 +31,19 @@ public:
 		RoundTripDelay = 0.0;
 	}
 
+	UPROPERTY()
+	TArray<double> OffsetSamples;
+	
 	void SyncTimeWithServer();
-
-	UFUNCTION(Server, Unreliable)
-	void SR_RequestTime(double time);
-
-	UFUNCTION(Client, Unreliable)
-	void CL_UpdateTime(double serverTime, double requestTime);
 	
+	// Get current server time
+	UFUNCTION(BlueprintCallable)
+	double GetServerTime() const;
+
+	// Update RPC signatures  
+	UFUNCTION(Server, Reliable)
+	void SR_RequestTime(double clientTime);
 	
+	UFUNCTION(Client, Reliable)
+	void CL_UpdateTime(double serverTime, double clientTime);
 };

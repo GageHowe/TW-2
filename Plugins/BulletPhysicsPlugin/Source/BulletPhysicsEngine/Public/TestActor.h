@@ -42,7 +42,7 @@ public:
 	bool bHasLocalPlayerError = false;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	FBulletSimulationState CurrentState;
+	FBulletSimulationState LocalState;
 
 	// Server-only state buffer
 	// UPROPERTY(EditAnywhere, BlueprintReadWrite)
@@ -84,7 +84,7 @@ public:
 	{
 		FBulletSimulationState thisState;
 		// thisState.FrameNumber = CurrentFrameNumber;
-		thisState.CurrentTime = GetWorld()->GetTimeSeconds();
+		thisState.CurrentTime = FPlatformTime::Seconds();
 		// construct and add all object states
 		for (const auto& tuple : BodyToActor)
 		{
@@ -145,7 +145,7 @@ public:
 	
 	// send state and actors' last input
 	UFUNCTION(BlueprintCallable, NetMulticast, Unreliable)
-	void MC_SendStateToClients(FBulletSimulationState ServerState, const TArray<AActor*>& InputActors, const TArray<FTWPlayerInput>& PlayerInputs);
+	void MC_SendStateToClients(FBulletSimulationState ServerState, const TArray<AActor*>& PlayerInputs, const TArray<FTWPlayerInput>& PlayerInputss);
 
 	UFUNCTION(Server, Reliable)
 	void shootThing(TSubclassOf<ABasicPhysicsEntity> projectileClass, FRotator direction, FVector inheritedVelocity, FVector location, AActor* owner2);

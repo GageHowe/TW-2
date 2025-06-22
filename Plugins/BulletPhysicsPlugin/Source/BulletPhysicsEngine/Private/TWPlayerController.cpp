@@ -3,7 +3,7 @@
 // this is the player's player controller for ThreadWraith.
 
 #include "TWPlayerController.h"
-
+#include "HAL/PlatformFilemanager.h"
 
 void ATWPlayerController::BeginPlay()
 {
@@ -15,7 +15,7 @@ void ATWPlayerController::SetupTimeSyncTimer()
 {
 	if (!HasAuthority())
 	{
-		GetWorldTimerManager().SetTimer(TimeSyncTimerHandle, this, &ATWPlayerController::SyncTimeWithServer, 0.2f, true);
+		GetWorldTimerManager().SetTimer(TimeSyncTimerHandle, this, &ATWPlayerController::SyncTimeWithServer, 1.0f, true);
 	}
 }
 
@@ -23,34 +23,40 @@ void ATWPlayerController::SyncTimeWithServer()
 {
 	if (!HasAuthority())
 	{
-		auto localTime = GetWorld()->TimeSeconds;
-		SR_RequestTime(localTime);
-	} else {
-		GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Red, TEXT("Uh, you just called SyncTimeWithServer() from the server"));
+		double clientTime = FPlatformTime::Seconds();
+		SR_RequestTime(clientTime);
 	}
 }
 
-void ATWPlayerController::SR_RequestTime_Implementation(double requestTime)
+void ATWPlayerController::SR_RequestTime_Implementation(double clientTime)
 {
-	double serverTime = GetWorld()->TimeSeconds;
-	CL_UpdateTime(serverTime, requestTime);
+	double serverTime = FPlatformTime::Seconds();
+	CL_UpdateTime(serverTime, clientTime);
 }
 
-void ATWPlayerController::CL_UpdateTime_Implementation(double serverTime, double requestTime)
+void ATWPlayerController::CL_UpdateTime_Implementation(double serverTime, double clientTime)
 {
-	double localTime = GetWorld()->TimeSeconds;
-	RoundTripDelay = localTime - requestTime;
-	TimeOffset = RoundTripDelay / 2;
-
-	// sync client clock
-	double lastTime = GetWorld()->TimeSeconds;
-	GetWorld()->TimeSeconds = serverTime + TimeOffset;
-
-	// logging
+	double currentTime = FPlatformTime::Seconds();
+	double roundTrip = currentTime - clientTime;
+	double offset = serverTime - clientTime - (roundTrip * 0.5);
 	
-	// GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Green, 
-	// FString::Printf(TEXT("RoundTrip: %f, Half: %f, clock set to: %f, was %f"), 
-	// RoundTripDelay, TimeOffset, GetWorld()->TimeSeconds, lastTime));
-	// UE_LOG(LogTemp, Warning, TEXT("RoundTrip: %f, Half: %f, clock set to: %f, was %f"), 
-	// RoundTripDelay, TimeOffset, GetWorld()->TimeSeconds, lastTime);
+	// Simple moving average with last few samples
+	OffsetSamples.Add(offset);
+	if (OffsetSamples.Num() > 5)
+	{
+		OffsetSamples.RemoveAt(0);
+	}
+	
+	// Calculate average
+	double sum = 0.0;
+	for (double sample : OffsetSamples)
+	{
+		sum += sample;
+	}
+	TimeOffset = sum / OffsetSamples.Num();
+}
+
+double ATWPlayerController::GetServerTime() const
+{
+	return FPlatformTime::Seconds() + TimeOffset;
 }
