@@ -139,6 +139,7 @@ void ATestActor::AsyncPhysicsTickActor(float DeltaTime, float SimTime)
 	{
 		StateHistory.Push(LocalState);
 	}
+	ticker += 1;
 }
 
 
@@ -184,7 +185,7 @@ void ATestActor::shootThing_Implementation(TSubclassOf<ABasicPhysicsEntity> proj
  */
 void ATestActor::MC_SendStateToClients_Implementation(FBulletSimulationState ServerState, const TArray<AActor*>& InputActors, const TArray<FTWPlayerInput>& PlayerInputs)
 {
-    if (!HasAuthority())
+    if (!HasAuthority() && ticker % 20 == 0) // TODO remove this testing
     {
         APlayerController* PC = GetWorld()->GetFirstPlayerController();
         ATWPlayerController* TWPC = Cast<ATWPlayerController>(PC); 

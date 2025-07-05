@@ -50,8 +50,10 @@ public:
 	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	ABasicPhysicsPawn* LocalPawn; // this is set on PossessedBy
-
-	// bool tock = false; // for syncing every other tick (30/s)
+	
+	// non-replicated number, incremented every tick
+	// e.g. for only resimulating every x ticks
+	int ticker;
 
 	// Frames
 	// UPROPERTY(EditAnywhere, BlueprintReadWrite)

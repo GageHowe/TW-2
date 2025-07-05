@@ -4,6 +4,17 @@
 
 #include "TWPlayerController.h"
 #include "HAL/PlatformFilemanager.h"
+#include "Algo/Sort.h"
+
+ATWPlayerController::ATWPlayerController()
+{
+	// Optionally initialize variables here
+	TimeOffset = 0.0;
+	SampleCount = 0;
+	bTimeSyncStable = false;
+	BestRTT = DBL_MAX;
+	LastClientRequestTime = 0.0;
+}
 
 void ATWPlayerController::BeginPlay()
 {
@@ -38,25 +49,61 @@ void ATWPlayerController::CL_UpdateTime_Implementation(double serverTime, double
 {
 	double currentTime = FPlatformTime::Seconds();
 	double roundTrip = currentTime - clientTime;
-	double offset = serverTime - clientTime - (roundTrip * 0.5);
-	
-	// Simple moving average with last few samples
-	OffsetSamples.Add(offset);
-	if (OffsetSamples.Num() > 5)
+
+	// Only accept round trips that are close to the best seen
+	if (roundTrip < BestRTT * 1.2)
 	{
-		OffsetSamples.RemoveAt(0);
+		if (roundTrip < BestRTT)
+		{
+			BestRTT = roundTrip;
+		}
+
+		double offset = serverTime - clientTime - (roundTrip * 0.5);
+
+		// Add sample to sliding window
+		OffsetSamples.Add(offset);
+		if (OffsetSamples.Num() > 15)
+		{
+			OffsetSamples.RemoveAt(0);
+		}
+
+		// Trimmed mean calculation
+		TArray<double> SortedSamples = OffsetSamples;
+		Algo::Sort(SortedSamples);
+
+		int NumSamples = SortedSamples.Num();
+		int Trim = FMath::FloorToInt(NumSamples * 0.2); // 20% trimming
+		int Start = FMath::Clamp(Trim, 0, NumSamples - 1);
+		int End = FMath::Clamp(NumSamples - Trim, Start + 1, NumSamples);
+
+		double Sum = 0.0;
+		for (int i = Start; i < End; ++i)
+		{
+			Sum += SortedSamples[i];
+		}
+
+		double NewOffset = Sum / (End - Start);
+
+		// EWMA smoothing for stability (adjust factor as needed)
+		constexpr double SmoothingFactor = 0.1;
+		TimeOffset = (1.0 - SmoothingFactor) * TimeOffset + SmoothingFactor * NewOffset;
 	}
-	
-	// Calculate average
-	double sum = 0.0;
-	for (double sample : OffsetSamples)
-	{
-		sum += sample;
-	}
-	TimeOffset = sum / OffsetSamples.Num();
 }
+
 
 double ATWPlayerController::GetServerTime() const
 {
 	return FPlatformTime::Seconds() + TimeOffset;
+}
+
+void ATWPlayerController::Tick(float DeltaTime)
+{
+	Super::Tick(DeltaTime);
+	if (HasAuthority())
+	{
+		UE_LOG(LogTemp, Warning, TEXT("ACTUAL: %.6f"), FPlatformTime::Seconds());
+	} else
+	{
+		UE_LOG(LogTemp, Warning, TEXT("PREDICTED: %.6f"), GetServerTime());
+	}
 }

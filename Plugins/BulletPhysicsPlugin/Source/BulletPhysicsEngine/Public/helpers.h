@@ -57,7 +57,7 @@ struct FBulletObjectState
 	FTransform Transform;
 
 	UPROPERTY(BlueprintReadWrite)
-	FVector Velocity;
+	FVector Velocity = {0,0,0};
 
 	UPROPERTY(BlueprintReadWrite)
 	FVector AngularVelocity;
