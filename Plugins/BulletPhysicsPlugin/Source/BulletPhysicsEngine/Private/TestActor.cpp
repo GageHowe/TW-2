@@ -225,9 +225,7 @@ void ATestActor::MC_SendStateToClients_Implementation(FBulletSimulationState Ser
         for (int i = 0; i < framesToRewind; i++)
         {
             FTWPlayerInput PastInput = LocalInputBuffer.Get(framesToRewind-i);
-            try {
-                LocalPawn->ApplyInputs(PastInput);
-            } catch(...) {}
+            if (LocalPawn) LocalPawn->ApplyInputs(PastInput);
             StepPhysics(FixedDeltaTime, 1);
         }
         
@@ -242,8 +240,9 @@ void ATestActor::MC_SendStateToClients_Implementation(FBulletSimulationState Ser
             
             if (oldPredicted)
             {
-                FBulletObjectState smoothedState = InterpolateObjectStates(*oldPredicted, correctedState, 0.05);
-                SetBodyState(body, smoothedState);
+                // FBulletObjectState smoothedState = InterpolateObjectStates(*oldPredicted, correctedState, 0.05);
+                // SetBodyState(body, smoothedState);
+                SetBodyState(body, correctedState);
             }
         }
     }
@@ -695,7 +694,7 @@ btRigidBody* ATestActor::AddRigidBody(AActor* Actor, btCollisionShape* Collision
 
 void ATestActor::StepPhysics(float DeltaSeconds, int substeps)
 {
-	BtWorld->stepSimulation(DeltaSeconds, substeps, 1. / 60);
+	if (BtWorld) BtWorld->stepSimulation(DeltaSeconds, substeps, 1. / 60);
 }
 
 void ATestActor::SetPhysicsState(int ID, FTransform transforms, FVector Velocity, FVector AngularVelocity, FVector& Force)
