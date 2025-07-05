@@ -96,7 +96,7 @@ I'll post some more progress, a guide to the codebase, etc etc onboarding/learni
 	void Resim(FBulletSimulationState ServerState);
 
 	UFUNCTION(BlueprintCallable)
-	FBulletSimulationState GetCurrentState() const
+	FBulletSimulationState GetCurrentState()
 	{
 		FBulletSimulationState thisState;
 		// thisState.FrameNumber = CurrentFrameNumber;
@@ -107,7 +107,7 @@ I'll post some more progress, a guide to the codebase, etc etc onboarding/learni
 			FBulletObjectState os;
 			btRigidBody* body = tuple.Key;
 			os.Actor = tuple.Value;
-			os.Transform = BulletHelpers::ToUE(body->getWorldTransform(), GetActorLocation());
+			os.Transform = BulletHelpers::ToUE(body->getWorldTransform(), {0,0,0});
 			os.Velocity = BulletHelpers::ToUEDir(body->getLinearVelocity(), true);
 			os.AngularVelocity = BulletHelpers::ToUEDir(body->getAngularVelocity(), true);
 	
@@ -115,6 +115,18 @@ I'll post some more progress, a guide to the codebase, etc etc onboarding/learni
 		}
 		return thisState;
 	}
+
+	FBulletObjectState GetObjectState(btRigidBody* body)
+	{
+		FBulletObjectState os;
+		os.Transform = BulletHelpers::ToUE(body->getWorldTransform(), {0,0,0});
+		os.Velocity = BulletHelpers::ToUEDir(body->getLinearVelocity(), true);
+		os.AngularVelocity = BulletHelpers::ToUEDir(body->getAngularVelocity(), true);
+		os.Actor = BodyToActor[body];
+
+		return os;
+	}
+
 	
 	void SetLocalState(FBulletSimulationState ServerState)
 	{

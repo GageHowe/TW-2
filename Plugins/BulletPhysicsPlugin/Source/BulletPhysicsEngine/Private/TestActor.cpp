@@ -655,7 +655,7 @@ btRigidBody* ATestActor::AddRigidBody(AActor* Actor, btCollisionShape* Collision
 	Body->setActivationState(DISABLE_DEACTIVATION); // changed from ACTIVE_TAG, change back after the freezing is resolved - Gage
 	Body->setDeactivationTime(0);
 
-	BtWorld->addRigidBody(Body);
+	if (BtWorld) BtWorld->addRigidBody(Body); // redundant error checking?
 	BtRigidBodies.Add(Body);
 
 	return Body;
