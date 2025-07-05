@@ -36,10 +36,23 @@ public:
 	ATestActor();
 
 	// for interpolation/correction
-	UPROPERTY()
-	FBulletObjectState LocalPlayerError;
-	UPROPERTY()
-	bool bHasLocalPlayerError = false;
+	// UPROPERTY()
+	// FBulletObjectState LocalPlayerError;
+	// UPROPERTY()
+	// bool bHasLocalPlayerError = false;
+
+	TMap<AActor*, FBulletObjectState> InterpolationErrors; // TODO: https://chatgpt.com/c/6868b3e4-7938-8008-b2d7-de4fd47cdc31
+	TMap<AActor*, bool> bHasInterpolationError;
+
+	/*
+	*Hey yall! Just wanted to let you that I've been working on threadwraith through this summer... and I have something I'm ready to show you. Client-side physics prediction works, and vastly better than I ever could have expected. 
+
+
+
+This has been an absolutely wild ride and I'm beyond hyped this finally works. Obviously there's still work to do on this front; the error between prediction and reality needs to be interpolated away instead of hard snapped. But there's finally a solid networking baseline to continue work off of.
+
+I'll post some more progress, a guide to the codebase, etc etc onboarding/learning stuff for whoever wants to help develop this.
+*/
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FBulletSimulationState LocalState;
@@ -80,6 +93,7 @@ public:
 
 	UFUNCTION()
 	void SendInputToServer(AActor* actor, FTWPlayerInput input);
+	void Resim(FBulletSimulationState ServerState);
 
 	UFUNCTION(BlueprintCallable)
 	FBulletSimulationState GetCurrentState() const

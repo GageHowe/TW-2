@@ -46,40 +46,10 @@ void ATestActor::Tick(float DeltaTime)
 	// Physics networking logic is now in async physics tick
 }
 
-void ATestActor::ApplyLocalPlayerErrorCorrection(float DeltaTime)
-{
-	const float CorrectionSpeed = 8.0f; // Adjust for correction rate
-    
-	btRigidBody* body = ActorToBody[LocalPawn];
-	if (!body) return;
-    
-	// Lerp position error toward zero
-	FVector positionCorrection = LocalPlayerError.Transform.GetLocation() * CorrectionSpeed * DeltaTime;
-	FVector velocityCorrection = LocalPlayerError.Velocity * CorrectionSpeed * DeltaTime;
-    
-	// Apply corrections
-	btTransform currentTransform = body->getWorldTransform();
-	currentTransform.setOrigin(currentTransform.getOrigin() + BulletHelpers::ToBtPos(positionCorrection, FVector::ZeroVector));
-	body->setWorldTransform(currentTransform);
-    
-	btVector3 currentVel = body->getLinearVelocity();
-	body->setLinearVelocity(currentVel + BulletHelpers::ToBtDir(velocityCorrection, true));
-    
-	// Reduce error
-	LocalPlayerError.Transform.SetLocation(LocalPlayerError.Transform.GetLocation() - positionCorrection);
-	LocalPlayerError.Velocity = LocalPlayerError.Velocity - velocityCorrection;
-    
-	// Clear error when small enough
-	if (LocalPlayerError.Transform.GetLocation().Size() < 1.0f && LocalPlayerError.Velocity.Size() < 10.0f)
-	{
-		bHasLocalPlayerError = false;
-	}
-}
-
 void ATestActor::AsyncPhysicsTickActor(float DeltaTime, float SimTime)
 {
 	
-	GEngine->AddOnScreenDebugMessage(2, 1.0f, FColor::Red, FString::Printf(TEXT("Error: %i"), bHasLocalPlayerError));
+	// GEngine->AddOnScreenDebugMessage(2, 1.0f, FColor::Red, FString::Printf(TEXT("Error: %i"), bHasLocalPlayerError));
 
 	// if (!HasAuthority() && bHasLocalPlayerError && LocalPawn)
 	// {
@@ -171,80 +141,79 @@ void ATestActor::shootThing_Implementation(TSubclassOf<ABasicPhysicsEntity> proj
 	// automatically via AddRigidBodyAndReturn
 }
 
-/* This performs a resimulation on every client.
- * In effect, this: resets every object's state to the one recieved by the server,
- * Simulates back up to the predicted moment, reapplying inputs for the local pawn
-*/
-/* This performs a resimulation on every client.
- * In effect, this: resets every object's state to the one received by the server,
- * Simulates back up to the predicted moment, reapplying inputs for the local pawn
- */
-/* This performs a resimulation on every client.
- * In effect, this: resets every object's state to the one received by the server,
- * Simulates back up to the predicted moment, reapplying inputs for the local pawn
- */
+void ATestActor::Resim(FBulletSimulationState ServerState)
+{
+	APlayerController* PC = GetWorld()->GetFirstPlayerController();
+	ATWPlayerController* TWPC = Cast<ATWPlayerController>(PC); 
+	if (!TWPC)
+	{
+		return;
+	}
+
+	// Use synchronized time instead of RTT/2
+	double currentServerTime = TWPC->GetServerTime();
+	double serverStateTime = ServerState.CurrentTime;
+	double timeDifference = currentServerTime - serverStateTime;
+	int framesToRewind = FMath::RoundToInt(timeDifference / FixedDeltaTime);
+        
+	// Store current predicted states before correction
+	TMap<AActor*, FBulletObjectState> PredictedStates;
+	for (const auto& pair : ActorToBody)
+	{
+		PredictedStates.Add(pair.Key, GetBodyState(pair.Value));
+	}
+        
+	// Apply server state directly
+	for (const auto& pair : ActorToBody)
+	{
+		AActor* actor = pair.Key;
+		btRigidBody* body = pair.Value;
+           
+		FBulletObjectState* SState = ServerState.ObjectStates.FindByPredicate([actor](const FBulletObjectState& state) 
+		{ 
+			return state.Actor == actor; 
+		});
+
+		if (SState)
+		{
+			SetBodyState(body, *SState);
+		}
+	}
+        
+	// Resimulate forward to get corrected prediction
+	for (int i = 0; i < framesToRewind; i++)
+	{
+		FTWPlayerInput PastInput = LocalInputBuffer.Get(framesToRewind-i);
+		if (LocalPawn) LocalPawn->ApplyInputs(PastInput);
+		StepPhysics(FixedDeltaTime, 1);
+	}
+        
+	// Now smooth between old prediction and corrected prediction
+	for (const auto& pair : ActorToBody)
+	{
+		AActor* actor = pair.Key;
+		btRigidBody* body = pair.Value;
+            
+		FBulletObjectState correctedState = GetBodyState(body);
+		FBulletObjectState* oldPredicted = PredictedStates.Find(actor);
+            
+		if (oldPredicted)
+		{
+			// FBulletObjectState smoothedState = InterpolateObjectStates(*oldPredicted, correctedState, 0.05);
+			// SetBodyState(body, smoothedState);
+			SetBodyState(body, correctedState);
+		}
+	}
+	return;
+}
+
+
 void ATestActor::MC_SendStateToClients_Implementation(FBulletSimulationState ServerState, const TArray<AActor*>& InputActors, const TArray<FTWPlayerInput>& PlayerInputs)
 {
-    if (!HasAuthority() && ticker % 20 == 0) // TODO remove this testing
+    if (!HasAuthority() ) // TODO remove this testing
     {
-        APlayerController* PC = GetWorld()->GetFirstPlayerController();
-        ATWPlayerController* TWPC = Cast<ATWPlayerController>(PC); 
-        if (!TWPC) return;
-        
-        // Use synchronized time instead of RTT/2
-        double currentServerTime = TWPC->GetServerTime();
-        double serverStateTime = ServerState.CurrentTime;
-        double timeDifference = currentServerTime - serverStateTime;
-        int framesToRewind = FMath::RoundToInt(timeDifference / FixedDeltaTime);
-        
-        // Store current predicted states before correction
-        TMap<AActor*, FBulletObjectState> PredictedStates;
-        for (const auto& pair : ActorToBody)
-        {
-            PredictedStates.Add(pair.Key, GetBodyState(pair.Value));
-        }
-        
-        // Apply server state directly
-        for (const auto& pair : ActorToBody)
-        {
-           AActor* actor = pair.Key;
-           btRigidBody* body = pair.Value;
-           
-           FBulletObjectState* SState = ServerState.ObjectStates.FindByPredicate([actor](const FBulletObjectState& state) 
-          { 
-             return state.Actor == actor; 
-          });
-
-           if (SState)
-           {
-               SetBodyState(body, *SState);
-           }
-        }
-        
-        // Resimulate forward to get corrected prediction
-        for (int i = 0; i < framesToRewind; i++)
-        {
-            FTWPlayerInput PastInput = LocalInputBuffer.Get(framesToRewind-i);
-            if (LocalPawn) LocalPawn->ApplyInputs(PastInput);
-            StepPhysics(FixedDeltaTime, 1);
-        }
-        
-        // Now smooth between old prediction and corrected prediction
-        for (const auto& pair : ActorToBody)
-        {
-            AActor* actor = pair.Key;
-            btRigidBody* body = pair.Value;
-            
-            FBulletObjectState correctedState = GetBodyState(body);
-            FBulletObjectState* oldPredicted = PredictedStates.Find(actor);
-            
-            if (oldPredicted)
-            {
-                // FBulletObjectState smoothedState = InterpolateObjectStates(*oldPredicted, correctedState, 0.05);
-                // SetBodyState(body, smoothedState);
-                SetBodyState(body, correctedState);
-            }
-        }
+	    Resim(ServerState);
+	    return;
     }
 }
 
